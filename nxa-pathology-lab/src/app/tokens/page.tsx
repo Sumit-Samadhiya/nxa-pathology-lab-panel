@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import QRCode from 'qrcode.react';
-import Barcode from 'react-barcode';
+import { QRCodeSVG as QRCode } from 'qrcode.react';
+import Barcode from 'react-barcode' assert { type: 'module' };
 import { useReactToPrint } from 'react-to-print';
 import {
   Box,
@@ -45,14 +45,6 @@ import {
   Stepper,
   StepLabel,
   StepContent,
-  Timeline,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineConnector,
-  TimelineContent,
-  TimelineDot,
-  TimelineOppositeContent,
-  Grid,
   Container,
   LinearProgress,
   Badge,
@@ -65,6 +57,7 @@ import {
   ListItemText,
   FormGroup,
   Slider,
+  Stack,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -76,7 +69,6 @@ import {
   Download as DownloadIcon,
   Send as SendIcon,
   QrCode2 as QrCodeIcon,
-  Barcode as BarcodeIcon,
   Search as SearchIcon,
   Refresh as RefreshIcon,
   PhoneAndroid as PhoneIcon,
@@ -89,6 +81,14 @@ import {
   GridColDef,
   GridRenderCellParams,
 } from '@mui/x-data-grid';
+import {
+  Timeline,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineConnector,
+  TimelineContent,
+  TimelineDot,
+} from '@mui/lab';
 import type {
   Booking,
   Patient,
@@ -97,6 +97,7 @@ import type {
   BookingType,
   BookingPackage,
   TokenStatus,
+  TimelineEvent,
   TimeSlot,
   DiscountReason,
 } from '@/types/token';
@@ -167,7 +168,7 @@ export default function TokensPage() {
   const [availableTests, setAvailableTests] = useState<BookingTest[]>([]);
   const [availablePackages, setAvailablePackages] = useState<BookingPackage[]>([]);
   const [selectedTests, setSelectedTests] = useState<BookingTest[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<BookingPackage | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<BookingPackage | undefined>(undefined);
 
   // Dialogs and modals
   const [openDialog, setOpenDialog] = useState<DialogType>('none');
@@ -191,7 +192,7 @@ export default function TokensPage() {
   // Print ref
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
-    content: () => printRef.current,
+    contentRef: printRef,
   });
 
   // Initialize with dummy data
@@ -264,7 +265,7 @@ export default function TokensPage() {
   // Handle package selection
   const handleSelectPackage = (pkg: BookingPackage) => {
     if (selectedPackage?.id === pkg.id) {
-      setSelectedPackage(null);
+      setSelectedPackage(undefined);
       setSelectedTests([]);
     } else {
       setSelectedPackage(pkg);
@@ -275,7 +276,7 @@ export default function TokensPage() {
   // Remove test from selection
   const handleRemoveTest = (testId: string) => {
     setSelectedTests(prev => prev.filter(t => t.id !== testId));
-    setSelectedPackage(null);
+    setSelectedPackage(undefined);
   };
 
   // Generate token
@@ -402,7 +403,7 @@ export default function TokensPage() {
     });
     setSelectedPatient(null);
     setSelectedTests([]);
-    setSelectedPackage(null);
+    setSelectedPackage(undefined);
     setFormErrors({});
   };
 
@@ -458,7 +459,7 @@ export default function TokensPage() {
       width: 140,
       renderCell: (params: GridRenderCellParams) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <BarcodeIcon sx={{ fontSize: 16 }} />
+          <QrCodeIcon sx={{ fontSize: 16 }} />
           <Typography variant="body2">{params.row.sample.sampleID}</Typography>
         </Box>
       ),
@@ -492,7 +493,7 @@ export default function TokensPage() {
       width: 110,
       renderCell: (params: GridRenderCellParams) => (
         <Chip
-          label={BOOKING_TYPE_LABELS[params.value]}
+          label={BOOKING_TYPE_LABELS[params.value as BookingType]}
           color="primary"
           variant="outlined"
           size="small"
@@ -510,9 +511,9 @@ export default function TokensPage() {
       width: 120,
       renderCell: (params: GridRenderCellParams) => (
         <Chip
-          label={STATUS_LABELS[params.value]}
+          label={STATUS_LABELS[params.value as TokenStatus]}
           sx={{
-            backgroundColor: STATUS_COLORS[params.value],
+            backgroundColor: STATUS_COLORS[params.value as TokenStatus],
             color: 'white',
           }}
           size="small"
@@ -633,11 +634,11 @@ export default function TokensPage() {
                         <Autocomplete
                           freeSolo
                           options={filteredPatients}
-                          getOptionLabel={p => `${p.name} - ${p.mobile}`}
+                          getOptionLabel={(p) => typeof p === 'string' ? p : `${p.name} - ${p.mobile}`}
                           inputValue={patientSearchQuery}
                           onInputChange={(e, value) => setPatientSearchQuery(value)}
                           onChange={(e, patient) => {
-                            if (patient) {
+                            if (patient && typeof patient !== 'string') {
                               handleSelectPatient(patient);
                             }
                           }}
@@ -651,7 +652,7 @@ export default function TokensPage() {
                             />
                           )}
                           renderOption={(props, option) => (
-                            <Box {...props} key={option.id}>
+                            <Box component="li" {...props} key={option.id}>
                               <Box sx={{ flex: 1 }}>
                                 <Typography variant="body2" fontWeight="bold">
                                   {option.name}
@@ -670,36 +671,36 @@ export default function TokensPage() {
 
                         {selectedPatient && (
                           <Card sx={{ bgcolor: 'action.hover', p: 2 }}>
-                            <Grid container spacing={2}>
-                              <Grid item xs={12} sm={6}>
+                            <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              <Box>
                                 <Typography variant="caption" color="textSecondary">
                                   Name
                                 </Typography>
                                 <Typography variant="body2" fontWeight="bold">
                                   {selectedPatient.name}
                                 </Typography>
-                              </Grid>
-                              <Grid item xs={12} sm={6}>
+                              </Box>
+                              <Box>
                                 <Typography variant="caption" color="textSecondary">
                                   Age/Gender
                                 </Typography>
                                 <Typography variant="body2">
                                   {selectedPatient.age} / {selectedPatient.gender}
                                 </Typography>
-                              </Grid>
-                              <Grid item xs={12} sm={6}>
+                              </Box>
+                              <Box>
                                 <Typography variant="caption" color="textSecondary">
                                   Mobile
                                 </Typography>
                                 <Typography variant="body2">{selectedPatient.mobile}</Typography>
-                              </Grid>
-                              <Grid item xs={12} sm={6}>
+                              </Box>
+                              <Box>
                                 <Typography variant="caption" color="textSecondary">
                                   Patient ID
                                 </Typography>
                                 <Typography variant="body2">{selectedPatient.patientID}</Typography>
-                              </Grid>
-                            </Grid>
+                              </Box>
+                            </Box>
                           </Card>
                         )}
 
@@ -738,8 +739,8 @@ export default function TokensPage() {
                             />
                           )}
                           renderOption={(props, option) => (
-                            <Box {...props} key={option.id} sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                              <Box>
+                            <Box component="li" {...props} key={option.id} sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap' }}>
+                              <Box sx={{ flex: 1 }}>
                                 <Typography variant="body2" fontWeight="bold">
                                   {option.testName}
                                 </Typography>
@@ -1011,7 +1012,7 @@ export default function TokensPage() {
                             onChange={e => setFormData(prev => ({ ...prev, discountPercent: parseFloat(e.target.value) || 0 }))}
                             sx={{ width: 120 }}
                           />
-                          {formData.discountPercent > 0 && (
+                          {(formData.discountPercent ?? 0) > 0 && (
                             <FormControl sx={{ flex: 1 }}>
                               <InputLabel>Discount Reason</InputLabel>
                               <Select
@@ -1031,30 +1032,26 @@ export default function TokensPage() {
 
                         {/* Final Amount */}
                         <Card sx={{ bgcolor: 'success.light', p: 2 }}>
-                          <Grid container spacing={2}>
-                            <Grid item xs={6}>
+                          <Stack gap={1}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                               <Typography variant="caption" color="textSecondary">
                                 Base Amount
                               </Typography>
                               <Typography variant="body2">{formatPrice(amounts.baseAmount)}</Typography>
-                            </Grid>
-                            <Grid item xs={6}>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                               <Typography variant="caption" color="textSecondary">
                                 Discount
                               </Typography>
                               <Typography variant="body2" color="error">
                                 -{formatPrice(amounts.discount)}
                               </Typography>
-                            </Grid>
-                            <Grid item xs={12}>
-                              <Divider />
-                            </Grid>
-                            <Grid item xs={12}>
-                              <Typography variant="h6" fontWeight="bold">
-                                Final Amount: {formatPrice(amounts.finalAmount)}
-                              </Typography>
-                            </Grid>
-                          </Grid>
+                            </Box>
+                            <Divider />
+                            <Typography variant="h6" fontWeight="bold">
+                              Final Amount: {formatPrice(amounts.finalAmount)}
+                            </Typography>
+                          </Stack>
                         </Card>
 
                         <Box sx={{ display: 'flex', gap: 2, pt: 2, justifyContent: 'space-between' }}>
@@ -1168,24 +1165,23 @@ export default function TokensPage() {
               </Typography>
 
               {/* Kanban Board */}
-              <Grid container spacing={2}>
-                {['Pending', 'Collected', 'Testing', 'Ready'].map((status, index) => {
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2 }}>
+                {(['Pending', 'Collected', 'Testing', 'Ready'] as TokenStatus[]).map((status) => {
                   const statusBookings = filteredBookings.filter(b => b.status === status);
-                  const statusKey = status as TokenStatus;
                   return (
-                    <Grid item xs={12} sm={6} md={3} key={status}>
+                    <Box key={status}>
                       <Card
                         sx={{
-                          backgroundColor: STATUS_COLORS[statusKey],
+                          backgroundColor: STATUS_COLORS[status],
                           opacity: 0.1,
                           minHeight: 400,
                         }}
                       >
                         <CardContent>
                           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                            {STATUS_LABELS[statusKey]} ({statusBookings.length})
+                            {STATUS_LABELS[status]} ({statusBookings.length})
                           </Typography>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Stack gap={1}>
                             {statusBookings.slice(0, 5).map(booking => (
                               <Card key={booking.id} sx={{ p: 1, cursor: 'pointer' }}>
                                 <Typography variant="caption" fontWeight="bold">
@@ -1204,53 +1200,52 @@ export default function TokensPage() {
                                 +{statusBookings.length - 5} more
                               </Typography>
                             )}
-                          </Box>
+                          </Stack>
                         </CardContent>
                       </Card>
-                    </Grid>
+                    </Box>
                   );
                 })}
-              </Grid>
-
+              </Box>
               {/* Statistics */}
               <Card sx={{ mt: 3, bgcolor: 'info.light', p: 2 }}>
                 <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                   Statistics
                 </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={3}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 2 }}>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Average TAT
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
                       {calculateAverageTAT(filteredBookings)} hours
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
+                  </Box>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Total Bookings
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
                       {filteredBookings.length}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
+                  </Box>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Total Revenue
                     </Typography>
                     <Typography variant="body2" fontWeight="bold" color="success.main">
                       {formatPrice(filteredBookings.reduce((sum, b) => sum + b.finalAmount, 0))}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
+                  </Box>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Overdue
                     </Typography>
                     <Typography variant="body2" fontWeight="bold" color="error">
                       {filteredBookings.filter(isBookingOverdue).length}
                     </Typography>
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
               </Card>
             </CardContent>
           </Card>
@@ -1299,40 +1294,40 @@ export default function TokensPage() {
 
               {/* Details */}
               <Card sx={{ bgcolor: 'action.hover', p: 2 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={3}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 2 }}>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Patient
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
                       {generatedToken.booking.patientName}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
+                  </Box>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Tests
                     </Typography>
                     <Typography variant="body2">
                       {generatedToken.booking.totalTests}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
+                  </Box>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Amount
                     </Typography>
                     <Typography variant="body2" fontWeight="bold" color="success.main">
                       {formatPrice(generatedToken.booking.finalAmount)}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
+                  </Box>
+                  <Box>
                     <Typography variant="caption" color="textSecondary">
                       Report Ready
                     </Typography>
                     <Typography variant="body2">
                       {generatedToken.reportTime}
                     </Typography>
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
               </Card>
 
               {/* Timeline */}
@@ -1341,10 +1336,10 @@ export default function TokensPage() {
                   Status Timeline
                 </Typography>
                 <Timeline>
-                  {generatedToken.booking.timeline.map((event, index) => (
+                  {generatedToken.booking.timeline.map((event: TimelineEvent, index: number) => (
                     <TimelineItem key={event.id}>
                       <TimelineSeparator>
-                        <TimelineDot sx={{ bgcolor: STATUS_COLORS[event.status] }} />
+                        <TimelineDot sx={{ bgcolor: STATUS_COLORS[event.status as TokenStatus] }} />
                         {index < generatedToken.booking.timeline.length - 1 && <TimelineConnector />}
                       </TimelineSeparator>
                       <TimelineContent>
@@ -1456,7 +1451,7 @@ export default function TokensPage() {
               <Typography variant="body2" gutterBottom>
                 <strong>Tests Ordered:</strong>
               </Typography>
-              {generatedToken.booking.tests.map((test, idx) => (
+              {generatedToken.booking.tests.map((test: BookingTest, idx: number) => (
                 <Typography key={idx} variant="body2">
                   • {test.testName}
                 </Typography>
@@ -1477,7 +1472,7 @@ export default function TokensPage() {
                   <Typography variant="body2" fontWeight="bold" gutterBottom>
                     Collection Instructions:
                   </Typography>
-                  {generatedToken.instructions.map((instruction, idx) => (
+                  {generatedToken.instructions.map((instruction: string, idx: number) => (
                     <Typography key={idx} variant="body2">
                       • {instruction}
                     </Typography>
