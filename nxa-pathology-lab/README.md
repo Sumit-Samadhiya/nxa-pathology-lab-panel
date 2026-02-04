@@ -78,8 +78,8 @@ src/
 
 The application uses a custom Material UI theme with the following configuration:
 
-- **Primary Color**: `#1976d2` (Blue)
-- **Secondary Color**: `#dc004e` (Pink)
+- **Primary Color**: `#C4590A` (Orange - Jansetu Brand)
+- **Secondary Color**: `#00008B` (Dark Blue - Jansetu Brand)
 - **Border Radius**: `8px`
 - **Typography**: Roboto font family with customized sizes
 

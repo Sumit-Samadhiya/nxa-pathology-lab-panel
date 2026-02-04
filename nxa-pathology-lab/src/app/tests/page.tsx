@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, Button, Paper, Grid, Card, CardContent } from '@mui/material';
+import { Box, Typography, Button, Paper, Card, CardContent } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
@@ -25,9 +25,16 @@ export default function TestsPage() {
           </Button>
         </Box>
 
-        <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+            gap: 3,
+            mb: 3,
+          }}
+        >
           {testCategories.map((category, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
+            <Box key={index}>
               <Card>
                 <CardContent>
                   <Typography variant="h5" sx={{ fontWeight: 700, color: category.color }}>
@@ -38,9 +45,9 @@ export default function TestsPage() {
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
 
         <Paper sx={{ p: 3, minHeight: 400 }}>
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
