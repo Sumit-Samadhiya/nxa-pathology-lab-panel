@@ -58,7 +58,7 @@ const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <HomeIcon />, path: '/dashboard' },
   { text: 'Patient Registration', icon: <PersonAddIcon />, path: '/patients' },
   { text: 'Test Catalog', icon: <ScienceIcon />, path: '/tests' },
-  { text: 'Sample Collection', icon: <LocalHospitalIcon />, path: '/samples' },
+  { text: 'Sample Collection', icon: <LocalHospitalIcon />, path: '/sample-collection' },
   { text: 'Testing & Entry', icon: <BiotechIcon />, path: '/testing' },
   { text: 'Report Generation', icon: <DescriptionIcon />, path: '/reports/generate' },
   { text: 'Report Management', icon: <FolderIcon />, path: '/reports' },
