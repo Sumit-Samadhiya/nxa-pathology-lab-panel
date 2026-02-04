@@ -4,14 +4,14 @@ export const lightThemeOptions: ThemeOptions = {
   palette: {
     mode: 'light',
     primary: {
-      main: '#1976d2',
-      light: '#42a5f5',
-      dark: '#1565c0',
+      main: '#C4590A',
+      light: '#D2691E',
+      dark: '#A04808',
     },
     secondary: {
-      main: '#dc004e',
-      light: '#f05545',
-      dark: '#9a0036',
+      main: '#00008B',
+      light: '#0000CD',
+      dark: '#000066',
     },
     background: {
       default: '#fafafa',
@@ -116,14 +116,14 @@ export const darkThemeOptions: ThemeOptions = {
   palette: {
     mode: 'dark',
     primary: {
-      main: '#1976d2',
-      light: '#42a5f5',
-      dark: '#1565c0',
+      main: '#D2691E',
+      light: '#FF8C42',
+      dark: '#A04808',
     },
     secondary: {
-      main: '#dc004e',
-      light: '#f05545',
-      dark: '#9a0036',
+      main: '#4169E1',
+      light: '#6495ED',
+      dark: '#00008B',
     },
     background: {
       default: '#121212',
