@@ -1,5 +1,11 @@
-import { Address } from './patient';
-import { Test } from './test';
+// Import only if patient.ts exports Address type
+// For now, define locally if not available
+export interface Address {
+  street?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+}
 
 // Enums
 export enum SampleQuality {
@@ -100,25 +106,16 @@ export enum TimeFilter {
   Next2Hours = 'Next 2 Hours'
 }
 
-export type CollectionMethod = 
-  | 'Random' 
-  | 'Midstream' 
-  | '24Hour';
-
 export type Department = 
   | 'Hematology' 
   | 'Biochemistry' 
   | 'Microbiology' 
   | 'Serology';
 
-export type PriorityLevel = 
-  | 'Normal' 
-  | 'Urgent' 
-  | 'STAT';
-
-export type BookingType = 
-  | 'WalkIn' 
-  | 'Scheduled';
+export type CollectionMethod = 
+  | 'Random' 
+  | 'Midstream' 
+  | '24Hour';
 
 export type RejectionReason = 
   | 'NotFasting' 
@@ -132,6 +129,8 @@ export type TimeSlot =
   | '9-12 PM' 
   | '12-3 PM' 
   | '3-6 PM';
+
+export type PriorityLevel = 'Normal' | 'Urgent' | 'STAT';
 
 // Interfaces
 export interface Collector {
@@ -216,7 +215,7 @@ export interface CollectionFormData {
     patientInformed: boolean;
   };
   department: Department;
-  priority: PriorityLevel;
+  priority: 'Normal' | 'Urgent' | 'STAT';
   priorityReason?: string;
 }
 
@@ -231,7 +230,7 @@ export interface Collection {
   bookingTime: string;
   bookingDate: string;
   status: CollectionStatus;
-  priority: PriorityLevel;
+  priority: 'Normal' | 'Urgent' | 'STAT';
   waitingTime?: number; // in minutes
   sampleRequirements: SampleRequirement[];
   specialInstructions?: string;
@@ -361,37 +360,35 @@ export interface SampleLabel {
 }
 
 // Constants
-export const TUBE_TYPES: Record<TubeType, { label: string; color: string }> = {
-  EDTA: { label: 'EDTA Tube (Purple Cap)', color: '#9C27B0' },
-  Plain: { label: 'Plain Tube (Red Cap)', color: '#F44336' },
-  SodiumCitrate: { label: 'Sodium Citrate Tube (Blue Cap)', color: '#2196F3' },
-  Fluoride: { label: 'Fluoride Tube (Gray Cap)', color: '#9E9E9E' },
-  Gel: { label: 'Gel Tube (Yellow Cap)', color: '#FFEB3B' },
+export const TUBE_TYPES: Record<string, { label: string; color: string }> = {
+  [TubeType.EdtaTube]: { label: 'EDTA Tube (Purple Cap)', color: '#9C27B0' },
+  [TubeType.PlainTube]: { label: 'Plain Tube (Red Cap)', color: '#F44336' },
+  [TubeType.SodiumCitrateTube]: { label: 'Sodium Citrate Tube (Blue Cap)', color: '#2196F3' },
+  [TubeType.FluorideTube]: { label: 'Fluoride Tube (Gray Cap)', color: '#9E9E9E' },
+  [TubeType.GelTube]: { label: 'Gel Tube (Yellow Cap)', color: '#FFEB3B' },
 };
 
 export const SAMPLE_QUALITY_OPTIONS: Record<SampleQuality, { label: string; icon: string; color: string }> = {
-  Good: { label: '✅ Good', icon: '✅', color: '#4CAF50' },
-  Hemolyzed: { label: '⚠️ Hemolyzed', icon: '⚠️', color: '#FF9800' },
-  Clotted: { label: '⚠️ Clotted', icon: '⚠️', color: '#FF9800' },
-  Insufficient: { label: '⚠️ Insufficient Volume', icon: '⚠️', color: '#FF9800' },
-  Lipemic: { label: '❌ Lipemic', icon: '❌', color: '#F44336' },
-  Contaminated: { label: '❌ Contaminated', icon: '❌', color: '#F44336' },
+  [SampleQuality.Good]: { label: '✅ Good', icon: '✅', color: '#4CAF50' },
+  [SampleQuality.Hemolyzed]: { label: '⚠️ Hemolyzed', icon: '⚠️', color: '#FF9800' },
+  [SampleQuality.Clotted]: { label: '⚠️ Clotted', icon: '⚠️', color: '#FF9800' },
+  [SampleQuality.InsufficientVolume]: { label: '⚠️ Insufficient Volume', icon: '⚠️', color: '#FF9800' },
+  [SampleQuality.Lipemic]: { label: '❌ Lipemic', icon: '❌', color: '#F44336' },
+  [SampleQuality.Contaminated]: { label: '❌ Contaminated', icon: '❌', color: '#F44336' },
 };
 
 export const STATUS_COLORS: Record<CollectionStatus, string> = {
-  Pending: '#FF9800',
-  Collected: '#4CAF50',
-  Rejected: '#F44336',
-  InProgress: '#2196F3',
-  QualityIssue: '#FF5722',
+  [CollectionStatus.Pending]: '#FF9800',
+  [CollectionStatus.Collected]: '#4CAF50',
+  [CollectionStatus.Rejected]: '#F44336',
 };
 
 export const HOME_COLLECTION_STATUS_COLORS: Record<HomeCollectionStatus, string> = {
-  PendingAssignment: '#FFC107',
-  Assigned: '#2196F3',
-  InProgress: '#FF9800',
-  Collected: '#4CAF50',
-  Cancelled: '#F44336',
+  [HomeCollectionStatus.PendingAssignment]: '#FFC107',
+  [HomeCollectionStatus.Assigned]: '#2196F3',
+  [HomeCollectionStatus.InProgress]: '#FF9800',
+  [HomeCollectionStatus.Collected]: '#4CAF50',
+  [HomeCollectionStatus.Cancelled]: '#F44336',
 };
 
 export const TIME_SLOTS: TimeSlot[] = ['6-9 AM', '9-12 PM', '12-3 PM', '3-6 PM'];
@@ -406,6 +403,16 @@ export const REJECTION_REASONS: RejectionReason[] = [
   'Other',
 ];
 
-export const COLLECTION_SITES: CollectionSite[] = ['LeftArm', 'RightArm', 'Hand', 'Other'];
+export const COLLECTION_SITES: CollectionSite[] = [
+  CollectionSite.LeftArm,
+  CollectionSite.RightArm,
+  CollectionSite.LeftHand,
+  CollectionSite.Other,
+];
 
-export const PATIENT_CONDITIONS: PatientCondition[] = ['Normal', 'Anxious', 'DifficultVeinAccess', 'Other'];
+export const PATIENT_CONDITIONS: PatientCondition[] = [
+  PatientCondition.Normal,
+  PatientCondition.Anxious,
+  PatientCondition.DifficultVeinAccess,
+  PatientCondition.Other,
+];
