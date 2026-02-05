@@ -68,6 +68,7 @@ import {
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
   Close as CloseIcon,
+  AccessTime as TimeIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
   Warning as WarningIcon,
@@ -273,8 +274,31 @@ export default function ReportGenerationPage() {
   });
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [uploadExternalDialogOpen, setUploadExternalDialogOpen] = useState(false);
+  const [externalReportFile, setExternalReportFile] = useState<File | null>(null);
+  const [externalReportName, setExternalReportName] = useState<string>('');
+  const [externalReportNotes, setExternalReportNotes] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+
+  // New feature states
+  const [bulkGenerateDialogOpen, setBulkGenerateDialogOpen] = useState(false);
+  const [reportTemplateDialogOpen, setReportTemplateDialogOpen] = useState(false);
+  const [scheduleReportDialogOpen, setScheduleReportDialogOpen] = useState(false);
+  const [reportHistoryDialogOpen, setReportHistoryDialogOpen] = useState(false);
+  const [bulkPublishDialogOpen, setBulkPublishDialogOpen] = useState(false);
+  const [exportReportDialogOpen, setExportReportDialogOpen] = useState(false);
+  const [templatePreviewDialogOpen, setTemplatePreviewDialogOpen] = useState(false);
+
+  // Bulk operations state
+  const [selectedTemplate, setSelectedTemplate] = useState<'standard' | 'detailed' | 'summary'>('standard');
+  const [scheduleDate, setScheduleDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [scheduleTime, setScheduleTime] = useState<string>('09:00');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'excel' | 'csv' | 'docx'>('pdf');
+  const [bulkPublishFormat, setBulkPublishFormat] = useState<'pdf' | 'email' | 'print'>('pdf');
+  const [reportHistory, setReportHistory] = useState<PublishedReport[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'week' | 'month' | 'quarter'>('all');
 
   // Signature canvas ref
   const signatureCanvasRef = useRef<SignatureCanvas>(null);
@@ -563,6 +587,228 @@ export default function ReportGenerationPage() {
     }
   }, []);
 
+  // Bulk Generation Handler
+  const handleBulkGenerate = useCallback(() => {
+    const selectedTestIds = Array.from(selectedRows.ids || []);
+    const testsToGenerate = testResults.filter(t => selectedTestIds.includes(t.id));
+    
+    if (testsToGenerate.length === 0) {
+      setSnackbar({ open: true, message: 'Please select at least one test', severity: 'warning' });
+      return;
+    }
+
+    setLoading(true);
+    setTimeout(() => {
+      const newDrafts = testsToGenerate.map(test => ({
+        reportId: generateReportID(),
+        sampleId: test.sampleId,
+        tokenNumber: test.tokenNumber,
+        patientName: test.patientName,
+        testName: test.testName,
+        savedBy: 'Current User',
+        lastModified: new Date(),
+        status: 'Draft' as const,
+        reportData: {
+          reportId: generateReportID(),
+          testResult: test,
+          interpretation: generateAutoInterpretation(test.parameters),
+          clinicalNotes: '',
+          criticalComments: test.hasCriticalValues ? 'Critical values detected - immediate physician notification done.' : '',
+          pathologist: undefined,
+          signatureType: 'none' as const,
+          signatureData: '',
+          template: selectedTemplate,
+          settings: reportSettings,
+          deliveryOptions: deliveryOptions,
+          certificationAccepted: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      })) as unknown as DraftReport[];
+
+      setDraftReports([...draftReports, ...newDrafts]);
+      setBulkGenerateDialogOpen(false);
+      setSelectedRows({ type: 'include', ids: new Set() });
+      setLoading(false);
+      setSnackbar({
+        open: true,
+        message: `${newDrafts.length} reports generated successfully!`,
+        severity: 'success'
+      });
+    }, 2000);
+  }, [selectedRows, testResults, draftReports, selectedTemplate, reportSettings, deliveryOptions]);
+
+  // Bulk Publish Handler
+  const handleBulkPublish = useCallback(async () => {
+    const selectedDraftIds = Array.from(selectedRows.ids || []);
+    const draftsToPubish = draftReports.filter(d => selectedDraftIds.includes(d.reportId));
+
+    if (draftsToPubish.length === 0) {
+      setSnackbar({ open: true, message: 'Please select at least one draft report', severity: 'warning' });
+      return;
+    }
+
+    setLoading(true);
+    setTimeout(() => {
+      const newPublished = draftsToPubish.map(draft => ({
+        ...draft,
+        status: 'Published' as const,
+        publishedTime: new Date(),
+        deliveryStatus: 'Sent' as const,
+        department: 'Pathology',
+        publishedBy: 'Current User',
+        hasCriticalValues: false,
+        viewCount: 0,
+        downloadCount: 0,
+      })) as unknown as PublishedReport[];
+
+      setPublishedReports([...publishedReports, ...newPublished]);
+      setDraftReports(draftReports.filter(d => !selectedDraftIds.includes(d.reportId)));
+      setBulkPublishDialogOpen(false);
+      setSelectedRows({ type: 'include', ids: new Set() });
+      setLoading(false);
+      setSnackbar({
+        open: true,
+        message: `${newPublished.length} reports published successfully!`,
+        severity: 'success'
+      });
+    }, 2000);
+  }, [selectedRows, draftReports, publishedReports]);
+
+  // Export Reports Handler
+  const handleExportReports = useCallback(() => {
+    const selectedIds = Array.from(selectedRows.ids || []);
+    let reportsToExport: any[] = [];
+
+    if (exportFormat === 'pdf') {
+      reportsToExport = publishedReports.filter(r => selectedIds.includes(r.reportId));
+      if (reportsToExport.length === 0) {
+        setSnackbar({ open: true, message: 'Please select reports to export', severity: 'warning' });
+        return;
+      }
+      // In production, generate PDF files
+      setSnackbar({
+        open: true,
+        message: `${reportsToExport.length} PDF reports ready for download`,
+        severity: 'success'
+      });
+    } else if (exportFormat === 'excel' || exportFormat === 'csv') {
+      reportsToExport = publishedReports.filter(r => selectedIds.includes(r.reportId));
+      // In production, generate Excel/CSV files
+      setSnackbar({
+        open: true,
+        message: `Exported ${reportsToExport.length} reports as ${exportFormat.toUpperCase()}`,
+        severity: 'success'
+      });
+    } else if (exportFormat === 'docx') {
+      reportsToExport = publishedReports.filter(r => selectedIds.includes(r.reportId));
+      // In production, generate DOCX files
+      setSnackbar({
+        open: true,
+        message: `Exported ${reportsToExport.length} reports as DOCX`,
+        severity: 'success'
+      });
+    }
+
+    setExportReportDialogOpen(false);
+    setSelectedRows({ type: 'include', ids: new Set() });
+  }, [selectedRows, publishedReports, exportFormat]);
+
+  // Schedule Report Generation Handler
+  const handleScheduleReportGeneration = useCallback(() => {
+    const selectedTestIds = Array.from(selectedRows.ids || []);
+    if (selectedTestIds.length === 0) {
+      setSnackbar({ open: true, message: 'Please select tests to schedule', severity: 'warning' });
+      return;
+    }
+
+    const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+    setSnackbar({
+      open: true,
+      message: `${selectedTestIds.length} reports scheduled for generation on ${formatDate(scheduledDateTime)}`,
+      severity: 'success'
+    });
+    setScheduleReportDialogOpen(false);
+    setSelectedRows({ type: 'include', ids: new Set() });
+  }, [selectedRows, scheduleDate, scheduleTime]);
+
+  // View Report History Handler
+  const handleViewReportHistory = useCallback(() => {
+    let filtered = publishedReports;
+
+    if (historyFilter === 'week') {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      filtered = publishedReports.filter(r => new Date(r.publishedTime) >= weekAgo);
+    } else if (historyFilter === 'month') {
+      const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      filtered = publishedReports.filter(r => new Date(r.publishedTime) >= monthAgo);
+    } else if (historyFilter === 'quarter') {
+      const quarterAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      filtered = publishedReports.filter(r => new Date(r.publishedTime) >= quarterAgo);
+    }
+
+    setReportHistory(filtered);
+    setReportHistoryDialogOpen(true);
+  }, [publishedReports, historyFilter]);
+
+  // Download Draft as Template
+  const handleDownloadAsTemplate = useCallback(() => {
+    if (selectedTest) {
+      const templateData = {
+        testName: selectedTest.testName,
+        department: selectedTest.department,
+        parameters: selectedTest.parameters,
+        generatedAt: new Date().toISOString(),
+      };
+      const dataStr = JSON.stringify(templateData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+      const exportFileDefaultName = `template-${selectedTest.testName}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      setSnackbar({ open: true, message: 'Template downloaded', severity: 'success' });
+    }
+  }, [selectedTest]);
+
+  // Print Reports Handler
+  const handlePrintReports = useCallback(() => {
+    const selectedIds = Array.from(selectedRows.ids || []);
+    const reportsToPrint = publishedReports.filter(r => selectedIds.includes(r.reportId));
+
+    if (reportsToPrint.length === 0) {
+      setSnackbar({ open: true, message: 'Please select reports to print', severity: 'warning' });
+      return;
+    }
+
+    window.print();
+    setSnackbar({
+      open: true,
+      message: `${reportsToPrint.length} reports sent to printer`,
+      severity: 'success'
+    });
+  }, [selectedRows, publishedReports]);
+
+  // Archive Report Handler
+  const handleArchiveReports = useCallback(() => {
+    const selectedIds = Array.from(selectedRows.ids || []);
+    const reportsToArchive = publishedReports.filter(r => selectedIds.includes(r.reportId));
+
+    if (reportsToArchive.length === 0) {
+      setSnackbar({ open: true, message: 'Please select reports to archive', severity: 'warning' });
+      return;
+    }
+
+    setPublishedReports(publishedReports.filter(r => !selectedIds.includes(r.reportId)));
+    setSnackbar({
+      open: true,
+      message: `${reportsToArchive.length} reports archived successfully`,
+      severity: 'success'
+    });
+  }, [selectedRows, publishedReports]);
+
   // DataGrid columns for Ready for Report
   const readyColumns: GridColDef<TestResult>[] = [
     {
@@ -780,10 +1026,59 @@ export default function ReportGenerationPage() {
             Refresh
           </Button>
           <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            sx={{ mr: 2 }}
+            onClick={() => setBulkGenerateDialogOpen(true)}
+          >
+            Bulk Generate
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<SendIcon />}
+            sx={{ mr: 2 }}
+            onClick={() => setBulkPublishDialogOpen(true)}
+          >
+            Bulk Publish
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<GetAppIcon />}
+            sx={{ mr: 2 }}
+            onClick={() => setExportReportDialogOpen(true)}
+          >
+            Export
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<PrintIcon />}
+            sx={{ mr: 2 }}
+            onClick={handlePrintReports}
+          >
+            Print
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<AssignmentIcon />}
+            sx={{ mr: 2 }}
+            onClick={() => setScheduleReportDialogOpen(true)}
+          >
+            Schedule
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<VisibilityIcon />}
+            sx={{ mr: 2 }}
+            onClick={handleViewReportHistory}
+          >
+            History
+          </Button>
+          <Button
             variant="contained"
             startIcon={<CloudUploadIcon />}
+            onClick={() => setUploadExternalDialogOpen(true)}
           >
-            Upload External Report
+            Upload
           </Button>
         </Box>
       </Box>
@@ -979,6 +1274,7 @@ export default function ReportGenerationPage() {
                 <DataGrid
                   rows={filteredTestResults}
                   columns={readyColumns}
+                  getRowId={(row) => row.id}
                   checkboxSelection
                   rowSelectionModel={selectedRows}
                   onRowSelectionModelChange={setSelectedRows}
@@ -1013,6 +1309,7 @@ export default function ReportGenerationPage() {
                 <DataGrid
                   rows={draftReports}
                   columns={draftColumns}
+                  getRowId={(row) => row.reportId}
                   pageSizeOptions={[10, 25, 50]}
                   initialState={{
                     pagination: { paginationModel: { pageSize: 25 } },
@@ -1032,6 +1329,7 @@ export default function ReportGenerationPage() {
                 <DataGrid
                   rows={publishedReports}
                   columns={publishedColumns}
+                  getRowId={(row) => row.reportId}
                   pageSizeOptions={[10, 25, 50]}
                   initialState={{
                     pagination: { paginationModel: { pageSize: 25 } },
@@ -1834,6 +2132,367 @@ export default function ReportGenerationPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Upload External Report Dialog */}
+      <Dialog 
+        open={uploadExternalDialogOpen} 
+        onClose={() => setUploadExternalDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CloudUploadIcon />
+          Upload External Report
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* File Upload Area */}
+            <Box
+              sx={{
+                border: '2px dashed',
+                borderColor: externalReportFile ? 'success.main' : 'primary.main',
+                borderRadius: 2,
+                p: 3,
+                textAlign: 'center',
+                cursor: 'pointer',
+                backgroundColor: externalReportFile ? 'success.lighter' : 'action.hover',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  backgroundColor: 'action.selected',
+                }
+              }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setExternalReportFile(file);
+                    setExternalReportName(file.name);
+                  }
+                }}
+                style={{ display: 'none' }}
+              />
+              <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+              <Typography variant="h6" sx={{ mb: 1 }}>
+                {externalReportFile ? 'File Selected ✓' : 'Click to Upload or Drag & Drop'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {externalReportFile ? externalReportName : 'PDF, JPG, or PNG (Max 10MB)'}
+              </Typography>
+              {externalReportFile && (
+                <Button
+                  size="small"
+                  color="error"
+                  sx={{ mt: 1 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExternalReportFile(null);
+                    setExternalReportName('');
+                  }}
+                >
+                  Remove File
+                </Button>
+              )}
+            </Box>
+
+            {/* Report Name */}
+            <TextField
+              label="Report Name"
+              value={externalReportName}
+              onChange={(e) => setExternalReportName(e.target.value)}
+              placeholder="e.g., CT Scan Report - Feb 2026"
+              fullWidth
+              size="small"
+            />
+
+            {/* Test Type (if applicable) */}
+            <FormControl fullWidth size="small">
+              <InputLabel>Test Type (Optional)</InputLabel>
+              <Select
+                label="Test Type (Optional)"
+                defaultValue=""
+              >
+                <MenuItem value="">None</MenuItem>
+                <MenuItem value="radiology">Radiology</MenuItem>
+                <MenuItem value="cardiology">Cardiology</MenuItem>
+                <MenuItem value="ultrasound">Ultrasound</MenuItem>
+                <MenuItem value="ecg">ECG</MenuItem>
+                <MenuItem value="pathology">Pathology</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Notes */}
+            <TextField
+              label="Additional Notes"
+              value={externalReportNotes}
+              onChange={(e) => setExternalReportNotes(e.target.value)}
+              placeholder="Enter any relevant notes about this report..."
+              multiline
+              rows={3}
+              fullWidth
+              size="small"
+            />
+
+            {/* Information Alert */}
+            <Alert severity="info">
+              <Typography variant="body2">
+                External reports will be attached to the patient's file and included in the final report.
+              </Typography>
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setUploadExternalDialogOpen(false);
+              setExternalReportFile(null);
+              setExternalReportName('');
+              setExternalReportNotes('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (externalReportFile) {
+                setSnackbar({
+                  open: true,
+                  message: `Report "${externalReportName}" uploaded successfully!`,
+                  severity: 'success'
+                });
+                setUploadExternalDialogOpen(false);
+                setExternalReportFile(null);
+                setExternalReportName('');
+                setExternalReportNotes('');
+              } else {
+                setSnackbar({
+                  open: true,
+                  message: 'Please select a file to upload',
+                  severity: 'warning'
+                });
+              }
+            }}
+            disabled={!externalReportFile}
+          >
+            Upload Report
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Generate Reports Dialog */}
+      <Dialog open={bulkGenerateDialogOpen} onClose={() => setBulkGenerateDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AddIcon /> Bulk Generate Reports
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {Array.from(selectedRows.ids || []).length} test(s) selected
+            </Typography>
+
+            <FormControl fullWidth>
+              <InputLabel>Report Template</InputLabel>
+              <Select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value as any)} label="Report Template">
+                <MenuItem value="standard">Standard Template</MenuItem>
+                <MenuItem value="detailed">Detailed Template</MenuItem>
+                <MenuItem value="summary">Summary Template</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControlLabel
+              control={<Checkbox defaultChecked />}
+              label="Include Previous Results"
+            />
+            <FormControlLabel
+              control={<Checkbox defaultChecked />}
+              label="Include QC Statement"
+            />
+            <FormControlLabel
+              control={<Checkbox defaultChecked />}
+              label="Add Auto-Interpretation"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkGenerateDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleBulkGenerate} disabled={loading}>
+            {loading ? <CircularProgress size={24} sx={{ mr: 1 }} /> : ''} Generate
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Publish Reports Dialog */}
+      <Dialog open={bulkPublishDialogOpen} onClose={() => setBulkPublishDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <SendIcon /> Bulk Publish Reports
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {Array.from(selectedRows.ids || []).length} draft(s) selected
+            </Typography>
+
+            <FormControl fullWidth>
+              <InputLabel>Publish Format</InputLabel>
+              <Select value={bulkPublishFormat} onChange={(e) => setBulkPublishFormat(e.target.value as any)} label="Publish Format">
+                <MenuItem value="pdf">PDF to Email</MenuItem>
+                <MenuItem value="email">Email (Direct)</MenuItem>
+                <MenuItem value="print">Print</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControlLabel
+              control={<Checkbox defaultChecked />}
+              label="Notify Patient"
+            />
+            <FormControlLabel
+              control={<Checkbox defaultChecked />}
+              label="Notify Referring Doctor"
+            />
+            <FormControlLabel
+              control={<Checkbox />}
+              label="Upload to Patient Portal"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkPublishDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleBulkPublish} disabled={loading}>
+            {loading ? <CircularProgress size={24} sx={{ mr: 1 }} /> : ''} Publish
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Export Reports Dialog */}
+      <Dialog open={exportReportDialogOpen} onClose={() => setExportReportDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <GetAppIcon /> Export Reports
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {Array.from(selectedRows.ids || []).length} report(s) selected
+            </Typography>
+
+            <FormControl fullWidth>
+              <InputLabel>Export Format</InputLabel>
+              <Select value={exportFormat} onChange={(e) => setExportFormat(e.target.value as any)} label="Export Format">
+                <MenuItem value="pdf">PDF Files</MenuItem>
+                <MenuItem value="excel">Excel Spreadsheet</MenuItem>
+                <MenuItem value="csv">CSV File</MenuItem>
+                <MenuItem value="docx">Word Document</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Alert severity="info">
+              <Typography variant="body2">
+                Reports will be exported and downloaded to your device.
+              </Typography>
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExportReportDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleExportReports}>
+            Export
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Schedule Report Generation Dialog */}
+      <Dialog open={scheduleReportDialogOpen} onClose={() => setScheduleReportDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <TimeIcon /> Schedule Report Generation
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {Array.from(selectedRows.ids || []).length} test(s) will be scheduled
+            </Typography>
+
+            <TextField
+              label="Schedule Date"
+              type="date"
+              value={scheduleDate}
+              onChange={(e) => setScheduleDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+
+            <TextField
+              label="Schedule Time"
+              type="time"
+              value={scheduleTime}
+              onChange={(e) => setScheduleTime(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+
+            <Alert severity="info">
+              <Typography variant="body2">
+                Reports will be automatically generated at the scheduled time.
+              </Typography>
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScheduleReportDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleScheduleReportGeneration}>
+            Schedule
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Report History Dialog */}
+      <Dialog open={reportHistoryDialogOpen} onClose={() => setReportHistoryDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <VisibilityIcon /> Report History
+          </Box>
+          <FormControl sx={{ minWidth: 150 }} size="small">
+            <InputLabel>Time Period</InputLabel>
+            <Select value={historyFilter} onChange={(e) => setHistoryFilter(e.target.value as any)} label="Time Period">
+              <MenuItem value="all">All Time</MenuItem>
+              <MenuItem value="week">Last 7 Days</MenuItem>
+              <MenuItem value="month">Last 30 Days</MenuItem>
+              <MenuItem value="quarter">Last 90 Days</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {reportHistory.length === 0 ? (
+            <Typography color="text.secondary">No reports found for the selected period.</Typography>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 400, overflow: 'auto' }}>
+              {reportHistory.map((report) => (
+                <Paper key={report.reportId} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      {report.patientName} - {report.testName}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Published: {formatDate(new Date(report.publishedTime))}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    icon={<CheckCircleIcon />}
+                    label="Published"
+                    color="success"
+                    variant="outlined"
+                  />
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReportHistoryDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
@@ -1845,7 +2504,7 @@ export default function ReportGenerationPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+      </Box>
     </DashboardLayout>
   );
 }
