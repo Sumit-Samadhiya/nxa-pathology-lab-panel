@@ -121,6 +121,8 @@ export default function TestsPage() {
   const [testDetailsDialogOpen, setTestDetailsDialogOpen] = useState(false);
   const [addPackageDialogOpen, setAddPackageDialogOpen] = useState(false);
   const [bulkImportDialogOpen, setBulkImportDialogOpen] = useState(false);
+  const [isEditModeTest, setIsEditModeTest] = useState(false);
+  const [isEditModePackage, setIsEditModePackage] = useState(false);
 
   const [selectedTest, setSelectedTest] = useState<Test | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
@@ -233,55 +235,107 @@ export default function TestsPage() {
       return;
     }
 
-    const newTest: Test = {
-      id: `test_${Date.now()}`,
-      testCode: testFormData.testCode,
-      testName: testFormData.testName,
-      shortName: testFormData.shortName,
-      category: testFormData.category as TestCategory,
-      subCategory: testFormData.subCategory || undefined,
-      description: testFormData.description || undefined,
-      keywords: testFormData.keywords,
-      sampleType: testFormData.sampleType as SampleType,
-      sampleVolume: testFormData.sampleVolume || undefined,
-      containerType: testFormData.containerType || undefined,
-      numberOfContainers: testFormData.numberOfContainers ? parseInt(testFormData.numberOfContainers) : undefined,
-      sampleHandlingInstructions: testFormData.sampleHandlingInstructions || undefined,
-      specialPrecautions: testFormData.specialPrecautions || undefined,
-      fastingRequired: testFormData.fastingRequired,
-      fastingDuration: testFormData.fastingDuration || undefined,
-      medicationsToAvoid: testFormData.medicationsToAvoid,
-      otherInstructions: testFormData.otherInstructions || undefined,
-      basePrice: parseFloat(testFormData.basePrice),
-      discountAllowed: testFormData.discountAllowed,
-      maxDiscountPercent: testFormData.maxDiscountPercent ? parseFloat(testFormData.maxDiscountPercent) : undefined,
-      emergencyCharges: testFormData.emergencyCharges ? parseFloat(testFormData.emergencyCharges) : undefined,
-      homeCollectionCharges: testFormData.homeCollectionCharges ? parseFloat(testFormData.homeCollectionCharges) : undefined,
-      packageInclusionAllowed: testFormData.packageInclusionAllowed,
-      reportTime: testFormData.reportTime as any,
-      reportFormat: testFormData.reportFormat as any,
-      reportTemplate: testFormData.reportTemplate || undefined,
-      criticalValueAlert: testFormData.criticalValueAlert,
-      parameters: testFormData.parameters,
-      analysisMethod: testFormData.analysisMethod as any,
-      machineInstrument: testFormData.machineInstrument || undefined,
-      machineTestCode: testFormData.machineTestCode || undefined,
-      qcRequirements: testFormData.qcRequirements || undefined,
-      department: testFormData.department || undefined,
-      requiresDoctorApproval: testFormData.requiresDoctorApproval,
-      minAge: testFormData.minAge ? parseInt(testFormData.minAge) : undefined,
-      maxAge: testFormData.maxAge ? parseInt(testFormData.maxAge) : undefined,
-      genderSpecific: testFormData.genderSpecific,
-      consentFormRequired: testFormData.consentFormRequired,
-      status: 'Active',
-      createdDate: new Date().toISOString().split('T')[0],
-      timesPerformed: 0,
-      revenueGenerated: 0,
-    };
+    if (isEditModeTest && selectedTest) {
+      // Update existing test
+      const updatedTest: Test = {
+        ...selectedTest,
+        testCode: testFormData.testCode,
+        testName: testFormData.testName,
+        shortName: testFormData.shortName,
+        category: testFormData.category as TestCategory,
+        subCategory: testFormData.subCategory || undefined,
+        description: testFormData.description || undefined,
+        keywords: testFormData.keywords,
+        sampleType: testFormData.sampleType as SampleType,
+        sampleVolume: testFormData.sampleVolume || undefined,
+        containerType: testFormData.containerType || undefined,
+        numberOfContainers: testFormData.numberOfContainers ? parseInt(testFormData.numberOfContainers) : undefined,
+        sampleHandlingInstructions: testFormData.sampleHandlingInstructions || undefined,
+        specialPrecautions: testFormData.specialPrecautions || undefined,
+        fastingRequired: testFormData.fastingRequired,
+        fastingDuration: testFormData.fastingDuration || undefined,
+        medicationsToAvoid: testFormData.medicationsToAvoid,
+        otherInstructions: testFormData.otherInstructions || undefined,
+        basePrice: parseFloat(testFormData.basePrice),
+        discountAllowed: testFormData.discountAllowed,
+        maxDiscountPercent: testFormData.maxDiscountPercent ? parseFloat(testFormData.maxDiscountPercent) : undefined,
+        emergencyCharges: testFormData.emergencyCharges ? parseFloat(testFormData.emergencyCharges) : undefined,
+        homeCollectionCharges: testFormData.homeCollectionCharges ? parseFloat(testFormData.homeCollectionCharges) : undefined,
+        packageInclusionAllowed: testFormData.packageInclusionAllowed,
+        reportTime: testFormData.reportTime as any,
+        reportFormat: testFormData.reportFormat as any,
+        reportTemplate: testFormData.reportTemplate || undefined,
+        criticalValueAlert: testFormData.criticalValueAlert,
+        parameters: testFormData.parameters,
+        analysisMethod: testFormData.analysisMethod as any,
+        machineInstrument: testFormData.machineInstrument || undefined,
+        machineTestCode: testFormData.machineTestCode || undefined,
+        qcRequirements: testFormData.qcRequirements || undefined,
+        department: testFormData.department || undefined,
+        requiresDoctorApproval: testFormData.requiresDoctorApproval,
+        minAge: testFormData.minAge ? parseInt(testFormData.minAge) : undefined,
+        maxAge: testFormData.maxAge ? parseInt(testFormData.maxAge) : undefined,
+        genderSpecific: testFormData.genderSpecific,
+        consentFormRequired: testFormData.consentFormRequired,
+      };
 
-    setTests(prev => [...prev, newTest]);
-    showSnackbar(`Test "${newTest.testName}" added successfully with code ${newTest.testCode}`, 'success');
+      setTests(prev => prev.map(t => t.id === selectedTest.id ? updatedTest : t));
+      showSnackbar(`Test "${updatedTest.testName}" updated successfully`, 'success');
+    } else {
+      // Add new test
+      const newTest: Test = {
+        id: `test_${Date.now()}`,
+        testCode: testFormData.testCode,
+        testName: testFormData.testName,
+        shortName: testFormData.shortName,
+        category: testFormData.category as TestCategory,
+        subCategory: testFormData.subCategory || undefined,
+        description: testFormData.description || undefined,
+        keywords: testFormData.keywords,
+        sampleType: testFormData.sampleType as SampleType,
+        sampleVolume: testFormData.sampleVolume || undefined,
+        containerType: testFormData.containerType || undefined,
+        numberOfContainers: testFormData.numberOfContainers ? parseInt(testFormData.numberOfContainers) : undefined,
+        sampleHandlingInstructions: testFormData.sampleHandlingInstructions || undefined,
+        specialPrecautions: testFormData.specialPrecautions || undefined,
+        fastingRequired: testFormData.fastingRequired,
+        fastingDuration: testFormData.fastingDuration || undefined,
+        medicationsToAvoid: testFormData.medicationsToAvoid,
+        otherInstructions: testFormData.otherInstructions || undefined,
+        basePrice: parseFloat(testFormData.basePrice),
+        discountAllowed: testFormData.discountAllowed,
+        maxDiscountPercent: testFormData.maxDiscountPercent ? parseFloat(testFormData.maxDiscountPercent) : undefined,
+        emergencyCharges: testFormData.emergencyCharges ? parseFloat(testFormData.emergencyCharges) : undefined,
+        homeCollectionCharges: testFormData.homeCollectionCharges ? parseFloat(testFormData.homeCollectionCharges) : undefined,
+        packageInclusionAllowed: testFormData.packageInclusionAllowed,
+        reportTime: testFormData.reportTime as any,
+        reportFormat: testFormData.reportFormat as any,
+        reportTemplate: testFormData.reportTemplate || undefined,
+        criticalValueAlert: testFormData.criticalValueAlert,
+        parameters: testFormData.parameters,
+        analysisMethod: testFormData.analysisMethod as any,
+        machineInstrument: testFormData.machineInstrument || undefined,
+        machineTestCode: testFormData.machineTestCode || undefined,
+        qcRequirements: testFormData.qcRequirements || undefined,
+        department: testFormData.department || undefined,
+        requiresDoctorApproval: testFormData.requiresDoctorApproval,
+        minAge: testFormData.minAge ? parseInt(testFormData.minAge) : undefined,
+        maxAge: testFormData.maxAge ? parseInt(testFormData.maxAge) : undefined,
+        genderSpecific: testFormData.genderSpecific,
+        consentFormRequired: testFormData.consentFormRequired,
+        status: 'Active',
+        createdDate: new Date().toISOString().split('T')[0],
+        timesPerformed: 0,
+        revenueGenerated: 0,
+      };
+
+      setTests(prev => [...prev, newTest]);
+      showSnackbar(`Test "${newTest.testName}" added successfully with code ${newTest.testCode}`, 'success');
+    }
+    
     setAddTestDialogOpen(false);
+    setIsEditModeTest(false);
+    setSelectedTest(null);
     setTestFormData(getEmptyTestForm());
     setTestFormErrors({});
   };
@@ -296,39 +350,73 @@ export default function TestsPage() {
       return;
     }
 
-    const newPackage: Package = {
-      id: `pkg_${Date.now()}`,
-      packageCode: packageFormData.packageCode,
-      packageName: packageFormData.packageName,
-      category: packageFormData.category as any,
-      description: packageFormData.description || undefined,
-      targetAudience: packageFormData.targetAudience,
-      includedTests: packageFormData.includedTests,
-      individualTotal: packageFormData.individualTotal,
-      packagePrice: parseFloat(packageFormData.packagePrice),
-      discountPercent: packageFormData.discountPercent,
-      savingsAmount: packageFormData.savingsAmount,
-      homeCollectionCharges: packageFormData.homeCollectionCharges ? parseFloat(packageFormData.homeCollectionCharges) : undefined,
-      finalPrice: packageFormData.finalPrice,
-      sampleTypesRequired: [],
-      fastingRequired: false,
-      reportTime: '24 Hours',
-      minAge: packageFormData.minAge ? parseInt(packageFormData.minAge) : undefined,
-      maxAge: packageFormData.maxAge ? parseInt(packageFormData.maxAge) : undefined,
-      genderSpecific: packageFormData.genderSpecific,
-      packageImage: packageFormData.packageImage || undefined,
-      highlightPoints: packageFormData.highlightPoints,
-      recommendedFor: packageFormData.recommendedFor || undefined,
-      displayOnWebsite: packageFormData.displayOnWebsite,
-      featuredPackage: packageFormData.featuredPackage,
-      status: 'Active',
-      popularity: 0,
-      createdDate: new Date().toISOString().split('T')[0],
-    };
+    if (isEditModePackage && selectedPackage) {
+      // Update existing package
+      const updatedPackage: Package = {
+        ...selectedPackage,
+        packageCode: packageFormData.packageCode,
+        packageName: packageFormData.packageName,
+        category: packageFormData.category as any,
+        description: packageFormData.description || undefined,
+        targetAudience: packageFormData.targetAudience,
+        includedTests: packageFormData.includedTests,
+        individualTotal: packageFormData.individualTotal,
+        packagePrice: parseFloat(packageFormData.packagePrice),
+        discountPercent: packageFormData.discountPercent,
+        savingsAmount: packageFormData.savingsAmount,
+        homeCollectionCharges: packageFormData.homeCollectionCharges ? parseFloat(packageFormData.homeCollectionCharges) : undefined,
+        finalPrice: packageFormData.finalPrice,
+        minAge: packageFormData.minAge ? parseInt(packageFormData.minAge) : undefined,
+        maxAge: packageFormData.maxAge ? parseInt(packageFormData.maxAge) : undefined,
+        genderSpecific: packageFormData.genderSpecific,
+        packageImage: packageFormData.packageImage || undefined,
+        highlightPoints: packageFormData.highlightPoints,
+        recommendedFor: packageFormData.recommendedFor || undefined,
+        displayOnWebsite: packageFormData.displayOnWebsite,
+        featuredPackage: packageFormData.featuredPackage,
+      };
 
-    setPackages(prev => [...prev, newPackage]);
-    showSnackbar(`Package "${newPackage.packageName}" created successfully`, 'success');
+      setPackages(prev => prev.map(p => p.id === selectedPackage.id ? updatedPackage : p));
+      showSnackbar(`Package "${updatedPackage.packageName}" updated successfully`, 'success');
+    } else {
+      // Add new package
+      const newPackage: Package = {
+        id: `pkg_${Date.now()}`,
+        packageCode: packageFormData.packageCode,
+        packageName: packageFormData.packageName,
+        category: packageFormData.category as any,
+        description: packageFormData.description || undefined,
+        targetAudience: packageFormData.targetAudience,
+        includedTests: packageFormData.includedTests,
+        individualTotal: packageFormData.individualTotal,
+        packagePrice: parseFloat(packageFormData.packagePrice),
+        discountPercent: packageFormData.discountPercent,
+        savingsAmount: packageFormData.savingsAmount,
+        homeCollectionCharges: packageFormData.homeCollectionCharges ? parseFloat(packageFormData.homeCollectionCharges) : undefined,
+        finalPrice: packageFormData.finalPrice,
+        sampleTypesRequired: [],
+        fastingRequired: false,
+        reportTime: '24 Hours',
+        minAge: packageFormData.minAge ? parseInt(packageFormData.minAge) : undefined,
+        maxAge: packageFormData.maxAge ? parseInt(packageFormData.maxAge) : undefined,
+        genderSpecific: packageFormData.genderSpecific,
+        packageImage: packageFormData.packageImage || undefined,
+        highlightPoints: packageFormData.highlightPoints,
+        recommendedFor: packageFormData.recommendedFor || undefined,
+        displayOnWebsite: packageFormData.displayOnWebsite,
+        featuredPackage: packageFormData.featuredPackage,
+        status: 'Active',
+        popularity: 0,
+        createdDate: new Date().toISOString().split('T')[0],
+      };
+
+      setPackages(prev => [...prev, newPackage]);
+      showSnackbar(`Package "${newPackage.packageName}" created successfully`, 'success');
+    }
+    
     setAddPackageDialogOpen(false);
+    setIsEditModePackage(false);
+    setSelectedPackage(null);
     setPackageFormData(getEmptyPackageForm());
     setPackageFormErrors({});
   };
@@ -441,6 +529,40 @@ export default function TestsPage() {
     }));
   };
 
+  // Handle bulk import file upload
+  const handleBulkImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Simulate file processing
+    showSnackbar('Processing import file...', 'info');
+    setTimeout(() => {
+      // Mock: Import 5 tests
+      const mockImportedTests = getDummyTests().slice(0, 5);
+      setTests(prev => [...mockImportedTests, ...prev]);
+      showSnackbar(`Successfully imported ${mockImportedTests.length} tests`, 'success');
+      setBulkImportDialogOpen(false);
+    }, 1500);
+  };
+
+  // Handle export tests
+  const handleExportTests = () => {
+    exportToExcel(tests, 'tests_catalog');
+    showSnackbar('Tests exported successfully', 'success');
+  };
+
+  // Handle export packages  
+  const handleExportPackages = () => {
+    exportPackagesToExcel(packages, 'packages_catalog');
+    showSnackbar('Packages exported successfully', 'success');
+  };
+
+  // Handle print catalog
+  const handlePrintCatalog = () => {
+    printTestCatalog(activeTab === 'tests' ? tests : packages, activeTab);
+    showSnackbar('Sending to printer...', 'info');
+  };
+
   // Tests DataGrid columns
   const testColumns: GridColDef[] = [
     {
@@ -548,7 +670,55 @@ export default function TestsPage() {
       renderCell: (params: GridRenderCellParams) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <Tooltip title="Edit">
-            <IconButton size="small" color="primary">
+            <IconButton 
+              size="small" 
+              color="primary"
+              onClick={() => {
+                setSelectedTest(params.row);
+                setTestFormData({
+                  testCode: params.row.testCode,
+                  testName: params.row.testName,
+                  shortName: params.row.shortName,
+                  category: params.row.category,
+                  subCategory: params.row.subCategory || '',
+                  description: params.row.description || '',
+                  keywords: params.row.keywords,
+                  sampleType: params.row.sampleType,
+                  sampleVolume: params.row.sampleVolume || '',
+                  containerType: params.row.containerType || '',
+                  numberOfContainers: params.row.numberOfContainers?.toString() || '',
+                  sampleHandlingInstructions: params.row.sampleHandlingInstructions || '',
+                  specialPrecautions: params.row.specialPrecautions || '',
+                  fastingRequired: params.row.fastingRequired,
+                  fastingDuration: params.row.fastingDuration || '',
+                  medicationsToAvoid: params.row.medicationsToAvoid,
+                  otherInstructions: params.row.otherInstructions || '',
+                  basePrice: params.row.basePrice.toString(),
+                  discountAllowed: params.row.discountAllowed,
+                  maxDiscountPercent: params.row.maxDiscountPercent?.toString() || '',
+                  emergencyCharges: params.row.emergencyCharges?.toString() || '',
+                  homeCollectionCharges: params.row.homeCollectionCharges?.toString() || '',
+                  packageInclusionAllowed: params.row.packageInclusionAllowed,
+                  reportTime: params.row.reportTime,
+                  reportFormat: params.row.reportFormat,
+                  reportTemplate: params.row.reportTemplate || '',
+                  criticalValueAlert: params.row.criticalValueAlert,
+                  parameters: params.row.parameters,
+                  analysisMethod: params.row.analysisMethod,
+                  machineInstrument: params.row.machineInstrument || '',
+                  machineTestCode: params.row.machineTestCode || '',
+                  qcRequirements: params.row.qcRequirements || '',
+                  department: params.row.department || '',
+                  requiresDoctorApproval: params.row.requiresDoctorApproval,
+                  minAge: params.row.minAge?.toString() || '',
+                  maxAge: params.row.maxAge?.toString() || '',
+                  genderSpecific: params.row.genderSpecific,
+                  consentFormRequired: params.row.consentFormRequired,
+                });
+                setIsEditModeTest(true);
+                setAddTestDialogOpen(true);
+              }}
+            >
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -646,7 +816,37 @@ export default function TestsPage() {
       renderCell: (params: GridRenderCellParams) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <Tooltip title="Edit">
-            <IconButton size="small" color="primary">
+            <IconButton 
+              size="small" 
+              color="primary"
+              onClick={() => {
+                setSelectedPackage(params.row);
+                setPackageFormData({
+                  packageCode: params.row.packageCode,
+                  packageName: params.row.packageName,
+                  category: params.row.category,
+                  description: params.row.description || '',
+                  targetAudience: params.row.targetAudience,
+                  includedTests: params.row.includedTests,
+                  individualTotal: params.row.individualTotal,
+                  packagePrice: params.row.packagePrice.toString(),
+                  discountPercent: params.row.discountPercent,
+                  savingsAmount: params.row.savingsAmount,
+                  homeCollectionCharges: params.row.homeCollectionCharges?.toString() || '',
+                  finalPrice: params.row.finalPrice,
+                  minAge: params.row.minAge?.toString() || '',
+                  maxAge: params.row.maxAge?.toString() || '',
+                  genderSpecific: params.row.genderSpecific,
+                  packageImage: params.row.packageImage || '',
+                  highlightPoints: params.row.highlightPoints,
+                  recommendedFor: params.row.recommendedFor || '',
+                  displayOnWebsite: params.row.displayOnWebsite,
+                  featuredPackage: params.row.featuredPackage,
+                });
+                setIsEditModePackage(true);
+                setAddPackageDialogOpen(true);
+              }}
+            >
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -669,7 +869,18 @@ export default function TestsPage() {
       <Box>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4">Test Catalog Management</Typography>
+          <Typography 
+            variant="h4"
+            sx={{ 
+              fontWeight: 'bold',
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}
+          >
+            Test Catalog Management
+          </Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
             {activeTab === 'tests' ? (
               <>
@@ -697,6 +908,8 @@ export default function TestsPage() {
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={() => {
+                    setIsEditModeTest(false);
+                    setSelectedTest(null);
                     setTestFormData({
                       ...getEmptyTestForm(),
                       testCode: generateTestCode('Hematology'),
@@ -723,6 +936,8 @@ export default function TestsPage() {
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={() => {
+                    setIsEditModePackage(false);
+                    setSelectedPackage(null);
                     setPackageFormData({
                       ...getEmptyPackageForm(),
                       packageCode: generatePackageCode(),
@@ -939,18 +1154,25 @@ export default function TestsPage() {
         </Card>
       </Box>
 
-      {/* Add Test Dialog - Simplified for space */}
+      {/* Add/Edit Test Dialog */}
       <Dialog
         open={addTestDialogOpen}
-        onClose={() => setAddTestDialogOpen(false)}
-        maxWidth="md"
+        onClose={() => {
+          setAddTestDialogOpen(false);
+          setIsEditModeTest(false);
+          setSelectedTest(null);
+        }}
+        maxWidth="lg"
         fullWidth
-        fullScreen
       >
         <DialogTitle>
-          Add New Test
+          {isEditModeTest ? 'Edit Test' : 'Add New Test'}
           <IconButton
-            onClick={() => setAddTestDialogOpen(false)}
+            onClick={() => {
+              setAddTestDialogOpen(false);
+              setIsEditModeTest(false);
+              setSelectedTest(null);
+            }}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
             <CloseIcon />
@@ -1354,17 +1576,25 @@ export default function TestsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Add Package Dialog */}
+      {/* Add/Edit Package Dialog */}
       <Dialog
         open={addPackageDialogOpen}
-        onClose={() => setAddPackageDialogOpen(false)}
+        onClose={() => {
+          setAddPackageDialogOpen(false);
+          setIsEditModePackage(false);
+          setSelectedPackage(null);
+        }}
         maxWidth="md"
         fullWidth
       >
         <DialogTitle>
-          Create New Package
+          {isEditModePackage ? 'Edit Package' : 'Create New Package'}
           <IconButton
-            onClick={() => setAddPackageDialogOpen(false)}
+            onClick={() => {
+              setAddPackageDialogOpen(false);
+              setIsEditModePackage(false);
+              setSelectedPackage(null);
+            }}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
             <CloseIcon />
@@ -1575,26 +1805,36 @@ export default function TestsPage() {
             <Typography variant="body2" color="textSecondary" paragraph>
               Upload a CSV file with test data. Make sure it follows the template format.
             </Typography>
-            <Box
-              sx={{
-                border: '2px dashed',
-                borderColor: 'divider',
-                borderRadius: 2,
-                p: 4,
-                cursor: 'pointer',
-                '&:hover': { bgcolor: 'action.hover' },
-              }}
-            >
-              <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-              <Typography>Drag and drop CSV file here or click to browse</Typography>
-            </Box>
+            <input
+              type="file"
+              id="bulk-import-file"
+              accept=".csv,.xlsx,.xls"
+              style={{ display: 'none' }}
+              onChange={handleBulkImportFile}
+            />
+            <label htmlFor="bulk-import-file">
+              <Box
+                component="div"
+                sx={{
+                  border: '2px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  p: 4,
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
+              >
+                <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                <Typography>Drag and drop CSV file here or click to browse</Typography>
+                <Typography variant="caption" color="textSecondary">
+                  Supported formats: CSV, XLS, XLSX
+                </Typography>
+              </Box>
+            </label>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setBulkImportDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled>
-            Import
-          </Button>
         </DialogActions>
       </Dialog>
 
