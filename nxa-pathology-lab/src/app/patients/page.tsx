@@ -95,6 +95,7 @@ export default function PatientsPage() {
   const [addPatientDialogOpen, setAddPatientDialogOpen] = useState(false);
   const [patientDetailsDialogOpen, setPatientDetailsDialogOpen] = useState(false);
   const [onlineBookingsDialogOpen, setOnlineBookingsDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Filter states
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -236,49 +237,94 @@ export default function PatientsPage() {
       return;
     }
 
-    const newPatient: Patient = {
-      id: generatePatientId(),
-      patientId: generatePatientId(),
-      fullName: formatPatientName(formData.fullName),
-      age: parseInt(formData.age),
-      dateOfBirth: formData.dateOfBirth,
-      gender: (formData.gender as 'Male' | 'Female' | 'Other') || 'Other',
-      bloodGroup: (formData.bloodGroup as any) || undefined,
-      mobileNumber: formData.mobileNumber,
-      alternateMobile: formData.alternateMobile || undefined,
-      email: formData.email || undefined,
-      address: {
-        line1: formData.addressLine1,
-        line2: formData.addressLine2 || undefined,
-        city: formData.city,
-        state: formData.state,
-        pinCode: formData.pinCode,
-      },
-      identification: {
-        aadharNumber: formData.aadharNumber || undefined,
-        healthId: formData.healthId || undefined,
-      },
-      emergencyContact: {
-        name: formData.emergencyContactName || undefined,
-        relationship: (formData.emergencyContactRelationship as any) || undefined,
-        mobileNumber: formData.emergencyContactMobile || undefined,
-      },
-      medicalInfo: {
-        allergies: formData.allergies || undefined,
-        chronicConditions: formData.chronicConditions,
-        currentMedications: formData.currentMedications || undefined,
-        previousSurgeries: formData.previousSurgeries || undefined,
-      },
-      registrationDate: new Date().toISOString().split('T')[0],
-      totalVisits: 0,
-      status: 'Active',
-      visitHistory: [],
-    };
+    if (isEditMode && selectedPatient) {
+      // Update existing patient
+      const updatedPatient: Patient = {
+        ...selectedPatient,
+        fullName: formatPatientName(formData.fullName),
+        age: parseInt(formData.age),
+        dateOfBirth: formData.dateOfBirth,
+        gender: (formData.gender as 'Male' | 'Female' | 'Other') || 'Other',
+        bloodGroup: (formData.bloodGroup as any) || undefined,
+        mobileNumber: formData.mobileNumber,
+        alternateMobile: formData.alternateMobile || undefined,
+        email: formData.email || undefined,
+        address: {
+          line1: formData.addressLine1,
+          line2: formData.addressLine2 || undefined,
+          city: formData.city,
+          state: formData.state,
+          pinCode: formData.pinCode,
+        },
+        identification: {
+          aadharNumber: formData.aadharNumber || undefined,
+          healthId: formData.healthId || undefined,
+        },
+        emergencyContact: {
+          name: formData.emergencyContactName || undefined,
+          relationship: (formData.emergencyContactRelationship as any) || undefined,
+          mobileNumber: formData.emergencyContactMobile || undefined,
+        },
+        medicalInfo: {
+          allergies: formData.allergies || undefined,
+          chronicConditions: formData.chronicConditions,
+          currentMedications: formData.currentMedications || undefined,
+          previousSurgeries: formData.previousSurgeries || undefined,
+        },
+      };
 
-    setPatients(prev => [...prev, newPatient]);
-    setSearchResults(prev => [...prev, newPatient]);
-    showSnackbar(`Patient ${newPatient.fullName} registered successfully with ID: ${newPatient.patientId}`, 'success');
+      setPatients(prev => prev.map(p => p.id === selectedPatient.id ? updatedPatient : p));
+      setSearchResults(prev => prev.map(p => p.id === selectedPatient.id ? updatedPatient : p));
+      showSnackbar(`Patient ${updatedPatient.fullName} updated successfully!`, 'success');
+    } else {
+      // Add new patient
+      const newPatient: Patient = {
+        id: generatePatientId(),
+        patientId: generatePatientId(),
+        fullName: formatPatientName(formData.fullName),
+        age: parseInt(formData.age),
+        dateOfBirth: formData.dateOfBirth,
+        gender: (formData.gender as 'Male' | 'Female' | 'Other') || 'Other',
+        bloodGroup: (formData.bloodGroup as any) || undefined,
+        mobileNumber: formData.mobileNumber,
+        alternateMobile: formData.alternateMobile || undefined,
+        email: formData.email || undefined,
+        address: {
+          line1: formData.addressLine1,
+          line2: formData.addressLine2 || undefined,
+          city: formData.city,
+          state: formData.state,
+          pinCode: formData.pinCode,
+        },
+        identification: {
+          aadharNumber: formData.aadharNumber || undefined,
+          healthId: formData.healthId || undefined,
+        },
+        emergencyContact: {
+          name: formData.emergencyContactName || undefined,
+          relationship: (formData.emergencyContactRelationship as any) || undefined,
+          mobileNumber: formData.emergencyContactMobile || undefined,
+        },
+        medicalInfo: {
+          allergies: formData.allergies || undefined,
+          chronicConditions: formData.chronicConditions,
+          currentMedications: formData.currentMedications || undefined,
+          previousSurgeries: formData.previousSurgeries || undefined,
+        },
+        registrationDate: new Date().toISOString().split('T')[0],
+        totalVisits: 0,
+        status: 'Active',
+        visitHistory: [],
+      };
+
+      setPatients(prev => [...prev, newPatient]);
+      setSearchResults(prev => [...prev, newPatient]);
+      showSnackbar(`Patient ${newPatient.fullName} registered successfully with ID: ${newPatient.patientId}`, 'success');
+    }
+    
     setAddPatientDialogOpen(false);
+    setIsEditMode(false);
+    setSelectedPatient(null);
     setFormData({
       fullName: '',
       age: '',
@@ -394,6 +440,30 @@ export default function PatientsPage() {
       ),
     },
     {
+      field: 'city',
+      headerName: 'City',
+      width: 120,
+      valueGetter: (_value, row) => row.address?.city || '—',
+      renderCell: (params: GridRenderCellParams) => (
+        <Typography variant="body2">
+          {params.value}
+        </Typography>
+      ),
+    },
+    {
+      field: 'totalVisits',
+      headerName: 'Total Visits',
+      width: 100,
+      renderCell: (params: GridRenderCellParams) => (
+        <Chip 
+          label={params.value || 0} 
+          size="small" 
+          color="primary" 
+          variant="outlined"
+        />
+      ),
+    },
+    {
       field: 'status',
       headerName: 'Status',
       width: 100,
@@ -421,7 +491,39 @@ export default function PatientsPage() {
             </IconButton>
           </Tooltip>
           <Tooltip title="Edit Patient">
-            <IconButton size="small" color="info">
+            <IconButton 
+              size="small" 
+              color="info"
+              onClick={() => {
+                setSelectedPatient(params.row);
+                setFormData({
+                  fullName: params.row.fullName,
+                  age: params.row.age.toString(),
+                  dateOfBirth: params.row.dateOfBirth,
+                  gender: params.row.gender,
+                  bloodGroup: params.row.bloodGroup || '',
+                  mobileNumber: params.row.mobileNumber,
+                  alternateMobile: params.row.alternateMobile || '',
+                  email: params.row.email || '',
+                  addressLine1: params.row.address.line1,
+                  addressLine2: params.row.address.line2 || '',
+                  city: params.row.address.city,
+                  state: params.row.address.state,
+                  pinCode: params.row.address.pinCode,
+                  aadharNumber: params.row.identification?.aadharNumber || '',
+                  healthId: params.row.identification?.healthId || '',
+                  emergencyContactName: params.row.emergencyContact?.name || '',
+                  emergencyContactRelationship: params.row.emergencyContact?.relationship || '',
+                  emergencyContactMobile: params.row.emergencyContact?.mobileNumber || '',
+                  allergies: params.row.medicalInfo?.allergies || '',
+                  chronicConditions: params.row.medicalInfo?.chronicConditions || [],
+                  currentMedications: params.row.medicalInfo?.currentMedications || '',
+                  previousSurgeries: params.row.medicalInfo?.previousSurgeries || '',
+                });
+                setIsEditMode(true);
+                setAddPatientDialogOpen(true);
+              }}
+            >
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -469,7 +571,18 @@ export default function PatientsPage() {
       <Box>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4">Patient Registration & Management</Typography>
+          <Typography 
+            variant="h4"
+            sx={{ 
+              fontWeight: 'bold',
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}
+          >
+            Patient Registration & Management
+          </Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Badge badgeContent={pendingBookingsCount} color="error">
               <Button
@@ -484,7 +597,11 @@ export default function PatientsPage() {
               variant="contained"
               color="primary"
               startIcon={<PersonAddIcon />}
-              onClick={() => setAddPatientDialogOpen(true)}
+              onClick={() => {
+                setIsEditMode(false);
+                setSelectedPatient(null);
+                setAddPatientDialogOpen(true);
+              }}
             >
               Add New Patient
             </Button>
@@ -626,12 +743,25 @@ export default function PatientsPage() {
         </Card>
       </Box>
 
-      {/* Add New Patient Dialog */}
-      <Dialog open={addPatientDialogOpen} onClose={() => setAddPatientDialogOpen(false)} maxWidth="md" fullWidth>
+      {/* Add/Edit Patient Dialog */}
+      <Dialog 
+        open={addPatientDialogOpen} 
+        onClose={() => {
+          setAddPatientDialogOpen(false);
+          setIsEditMode(false);
+          setSelectedPatient(null);
+        }} 
+        maxWidth="md" 
+        fullWidth
+      >
         <DialogTitle>
-          Add New Patient
+          {isEditMode ? 'Edit Patient' : 'Add New Patient'}
           <IconButton
-            onClick={() => setAddPatientDialogOpen(false)}
+            onClick={() => {
+              setAddPatientDialogOpen(false);
+              setIsEditMode(false);
+              setSelectedPatient(null);
+            }}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
             <CloseIcon />
@@ -858,16 +988,59 @@ export default function PatientsPage() {
                 </Box>
                 <Box>
                   <Typography variant="caption" color="textSecondary">
+                    Blood Group
+                  </Typography>
+                  <Typography>{selectedPatient.bloodGroup || '—'}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
                     Mobile
                   </Typography>
                   <Typography>{formatPhoneNumber(selectedPatient.mobileNumber)}</Typography>
                 </Box>
-                <Box sx={{ gridColumn: { xs: 'auto', sm: '1 / -1' } }}>
+                <Box>
                   <Typography variant="caption" color="textSecondary">
-                    Address
+                    Email
+                  </Typography>
+                  <Typography>{selectedPatient.email || '—'}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    City
+                  </Typography>
+                  <Typography>{selectedPatient.address.city}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    State
+                  </Typography>
+                  <Typography>{selectedPatient.address.state}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    Total Visits
                   </Typography>
                   <Typography>
-                    {selectedPatient.address.line1}, {selectedPatient.address.city}
+                    <Chip 
+                      label={selectedPatient.totalVisits || 0} 
+                      size="small" 
+                      color="primary" 
+                    />
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    Registration Date
+                  </Typography>
+                  <Typography>{formatDate(selectedPatient.registrationDate)}</Typography>
+                </Box>
+                <Box sx={{ gridColumn: { xs: 'auto', sm: '1 / -1' } }}>
+                  <Typography variant="caption" color="textSecondary">
+                    Full Address
+                  </Typography>
+                  <Typography>
+                    {selectedPatient.address.line1}
+                    {selectedPatient.address.line2 && `, ${selectedPatient.address.line2}`}, {selectedPatient.address.city}, {selectedPatient.address.state} - {selectedPatient.address.pinCode}
                   </Typography>
                 </Box>
               </Box>

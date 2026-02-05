@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -29,6 +29,17 @@ import {
   Paper,
   Tooltip,
   Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  InputAdornment,
+  Stack,
+  Radio,
+  RadioGroup,
+  FormLabel,
 } from '@mui/material';
 import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import {
@@ -45,6 +56,11 @@ import {
   Save as SaveIcon,
   Send as SubmitIcon,
   Close as CloseIcon,
+  Cancel as CancelIcon,
+  NotificationImportant as CriticalIcon,
+  AccessTime as TimeIcon,
+  Science as TestIcon,
+  Assignment as ReportIcon,
 } from '@mui/icons-material';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import {
@@ -64,8 +80,10 @@ import {
   CriticalValueNotification,
   Sample,
   Patient,
+  TestParameter,
 } from '@/types/testing';
 import { TEST_CONFIGS } from '@/config/tests';
+import { TestConfig, TEST_CONFIGS as NEW_TEST_CONFIGS } from '@/config/testConfigs';
 import {
   calculateFlag,
   isCritical,

@@ -569,7 +569,16 @@ export default function TokensPage() {
       <Box>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" fontWeight="bold">
+          <Typography 
+            variant="h4" 
+            fontWeight="bold"
+            sx={{ 
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}
+          >
             Token & Sample Management
           </Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
