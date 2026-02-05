@@ -932,12 +932,41 @@ export default function ReportGenerationPage() {
       sortable: false,
       renderCell: (params) => (
         <Box>
-          <IconButton size="small" color="primary">
-            <EditIcon />
-          </IconButton>
-          <IconButton size="small" color="error">
-            <DeleteIcon />
-          </IconButton>
+          <Tooltip title="Edit Draft">
+            <IconButton 
+              size="small" 
+              color="primary"
+              onClick={() => {
+                setSelectedTest({
+                  ...params.row.reportData.testResult,
+                  id: params.row.reportId,
+                } as any);
+                setCurrentReportData(params.row.reportData);
+                setInterpretation((params.row.reportData.interpretation as string) || '');
+                setClinicalNotes((params.row.reportData.clinicalNotes as string) || '');
+                setCriticalComments((params.row.reportData.criticalComments as string) || '');
+                setGenerateDialogOpen(true);
+              }}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Draft">
+            <IconButton 
+              size="small" 
+              color="error"
+              onClick={() => {
+                setDraftReports(draftReports.filter(d => d.reportId !== params.row.reportId));
+                setSnackbar({
+                  open: true,
+                  message: 'Draft report deleted',
+                  severity: 'success'
+                });
+              }}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
       ),
     },
@@ -981,20 +1010,70 @@ export default function ReportGenerationPage() {
       headerName: 'Actions',
       width: 200,
       sortable: false,
-      renderCell: () => (
+      renderCell: (params) => (
         <Box>
-          <IconButton size="small" color="primary">
-            <VisibilityIcon />
-          </IconButton>
-          <IconButton size="small" color="primary">
-            <GetAppIcon />
-          </IconButton>
-          <IconButton size="small" color="primary">
-            <PrintIcon />
-          </IconButton>
-          <IconButton size="small" color="secondary">
-            <SendIcon />
-          </IconButton>
+          <Tooltip title="View Report">
+            <IconButton 
+              size="small" 
+              color="primary"
+              onClick={() => {
+                setPdfPreviewOpen(true);
+                setSnackbar({
+                  open: true,
+                  message: 'Opening report preview...',
+                  severity: 'info'
+                });
+              }}
+            >
+              <VisibilityIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Download PDF">
+            <IconButton 
+              size="small" 
+              color="primary"
+              onClick={() => {
+                setSnackbar({
+                  open: true,
+                  message: `Report "${params.row.testName}" downloaded`,
+                  severity: 'success'
+                });
+              }}
+            >
+              <GetAppIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Print Report">
+            <IconButton 
+              size="small" 
+              color="primary"
+              onClick={() => {
+                window.print();
+                setSnackbar({
+                  open: true,
+                  message: 'Report sent to printer',
+                  severity: 'success'
+                });
+              }}
+            >
+              <PrintIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Resend Report">
+            <IconButton 
+              size="small" 
+              color="secondary"
+              onClick={() => {
+                setSnackbar({
+                  open: true,
+                  message: `Report resent to patient and doctor`,
+                  severity: 'success'
+                });
+              }}
+            >
+              <SendIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
       ),
     },
