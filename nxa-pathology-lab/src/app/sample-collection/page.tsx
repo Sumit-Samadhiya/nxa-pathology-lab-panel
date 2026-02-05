@@ -1,2013 +1,1207 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
-  Stack,
-  Typography,
+  Container,
+  Grid,
   Card,
   CardContent,
-  Button,
+  Typography,
+  Tabs,
+  Tab,
   TextField,
   Select,
   MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
+  Button,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  IconButton,
-  Tabs,
-  Tab,
-  Alert,
-  Snackbar,
-  Checkbox,
-  FormControlLabel,
-  FormGroup,
-  RadioGroup,
-  Radio,
-  Tooltip,
-  Badge,
-  Fab,
-  Divider,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-  Autocomplete,
-  Avatar,
   Paper,
+  Chip,
+  Avatar,
+  Stack,
+  Alert,
+  Snackbar,
+  CircularProgress,
+  Tooltip,
+  Switch,
+  FormControlLabel,
+  Checkbox,
+  FormGroup,
+  Radio,
+  RadioGroup,
+  FormControl,
+  FormLabel,
+  Divider,
+  Badge,
+  LinearProgress,
+  Autocomplete,
+  TablePagination,
 } from '@mui/material';
-import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+
 import {
-  Close as CloseIcon,
   HourglassEmpty as HourglassEmptyIcon,
   CheckCircle as CheckCircleIcon,
   LocalShipping as LocalShippingIcon,
   Warning as WarningIcon,
+  Alarm as AlarmIcon,
+  QrCodeScanner as QrCodeScannerIcon,
+  Search as SearchIcon,
+  Visibility as VisibilityIcon,
   Print as PrintIcon,
   Phone as PhoneIcon,
-  Visibility as VisibilityIcon,
-  Refresh as RefreshIcon,
-  QrCodeScanner as QrCodeScannerIcon,
-  Place as PlaceIcon,
-  Assignment as AssignmentIcon,
-  LocalHospital as LocalHospitalIcon,
-  CameraAlt as CameraAltIcon,
-  MyLocation as MyLocationIcon,
-  Route as RouteIcon,
-  CheckCircleOutline as CheckCircleOutlineIcon,
+  MoreVert as MoreVertIcon,
+  Download as DownloadIcon,
+  Add as AddIcon,
+  Close as CloseIcon,
+  RefreshRounded as RefreshIcon,
+  DashboardCustomize as DashboardCustomizeIcon,
+  Receipt as ReceiptIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  CallReceived as CallReceivedIcon,
+  Verified as VerifiedIcon,
+  Cancel as CancelIcon,
 } from '@mui/icons-material';
-import { QRCodeSVG } from 'qrcode.react';
-import Barcode from 'react-barcode';
-import { format } from 'date-fns';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import {
-  Collection,
-  HomeCollection,
-  Collector,
-  CollectionFormData,
-  SampleDetail,
-  QualityIssue,
-  SampleQuality,
-  CollectionStatus,
-  HomeCollectionStatus,
-  Department,
-  TubeType,
-  PatientCondition,
-  CollectionSite,
-  RouteStop,
-  AssignCollectorData,
-  TUBE_TYPES,
-  SAMPLE_QUALITY_OPTIONS,
-  STATUS_COLORS,
-  HOME_COLLECTION_STATUS_COLORS,
-  TIME_SLOTS,
-  DEPARTMENTS,
-} from '@/types/collection';
+
+import { Collection, HomeCollection, CollectionStatus, HomeCollectionStatus, Priority } from '@/types/collection';
 import {
   calculateWaitingTime,
   calculateWaitingMinutes,
-  getSampleRequirements,
+  formatDateTime,
+  formatAddress,
   generateCollectionSMS,
   generateCollectorSMS,
-  formatAddress,
-  formatTime,
-  formatDate,
-  formatDateTime,
-  isOverdue,
-  isUrgent,
-  getDepartmentForTests,
-  getReportReadyTime,
-  getGoogleMapsUrl,
-  optimizeRoute,
-  calculateRouteDistance,
-  groupByArea,
-  getUniqueAreas,
-  generateBarcodeData,
 } from '@/utils/collectionHelpers';
-import {
-  validateCollectionForm,
-  validateCollectorAssignment,
-  validateQualityChecklist,
-} from '@/utils/collectionValidation';
 
-// Dummy data generation functions
-function getDummyCollectors(): Collector[] {
-  return [
-    {
-      id: 'COL001',
-      name: 'Rajesh Kumar',
-      staffID: 'ST1001',
-      mobile: '9876543210',
-      currentAssignments: 3,
-      availability: 'Busy',
-      email: 'rajesh@lab.com',
-    },
-    {
-      id: 'COL002',
-      name: 'Priya Sharma',
-      staffID: 'ST1002',
-      mobile: '9876543211',
-      currentAssignments: 1,
-      availability: 'Free',
-      email: 'priya@lab.com',
-    },
-    {
-      id: 'COL003',
-      name: 'Amit Patel',
-      staffID: 'ST1003',
-      mobile: '9876543212',
-      currentAssignments: 0,
-      availability: 'Free',
-      email: 'amit@lab.com',
-    },
-    {
-      id: 'COL004',
-      name: 'Sneha Reddy',
-      staffID: 'ST1004',
-      mobile: '9876543213',
-      currentAssignments: 2,
-      availability: 'Free',
-      email: 'sneha@lab.com',
-    },
-    {
-      id: 'COL005',
-      name: 'Vikram Singh',
-      staffID: 'ST1005',
-      mobile: '9876543214',
-      currentAssignments: 4,
-      availability: 'Busy',
-      email: 'vikram@lab.com',
-    },
+// Helper functions for missing utilities
+const getWaitingColor = (minutes: number): string => {
+  if (minutes < 5) return '#4CAF50'; // Green
+  if (minutes < 15) return '#FFC107'; // Yellow
+  if (minutes < 30) return '#FF9800'; // Orange
+  return '#F44336'; // Red
+};
+
+const getPriorityLabel = (priority: string): string => {
+  switch (priority.toUpperCase()) {
+    case 'STAT':
+      return '🔴 STAT';
+    case 'URGENT':
+      return '🟠 Urgent';
+    case 'NORMAL':
+    default:
+      return '⚪ Normal';
+  }
+};
+
+const exportCollectionsToCSV = (collections: Collection[]): string => {
+  const headers = [
+    'Token Number',
+    'Sample ID',
+    'Patient Name',
+    'Mobile',
+    'Tests',
+    'Booking Time',
+    'Status',
+    'Waiting Time (mins)'
   ];
-}
 
-function getDummyPendingCollections(): Collection[] {
+  const rows = collections.map(c => [
+    c.tokenNumber,
+    c.sampleId,
+    c.patientName,
+    c.mobile,
+    Array.isArray(c.tests) ? c.tests.join('; ') : '',
+    new Date(c.bookingTime).toLocaleString(),
+    c.status,
+    c.waitingMinutes || 0
+  ]);
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+  ].join('\n');
+
+  return csvContent;
+};
+
+const downloadCSV = (content: string, filename: string = 'collections.csv'): void => {
+  if (typeof window === 'undefined') return;
+  
+  const element = document.createElement('a');
+  element.setAttribute('href', `data:text/csv;charset=utf-8,${encodeURIComponent(content)}`);
+  element.setAttribute('download', filename);
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+};
+
+// ============= MOCK DATA GENERATORS =============
+
+const generateMockCollections = (count: number): Collection[] => {
+  const testOptions = ['CBC', 'Blood Sugar', 'Lipid Profile', 'Urine Routine', 'Liver Function', 'Kidney Function', 'Thyroid'];
   const collections: Collection[] = [];
   const now = new Date();
 
-  // Sample 1: Overdue
-  collections.push({
-    id: 'C001',
-    tokenNumber: 'T-2024-001',
-    sampleID: 'S-2024-001',
-    bookingID: 'B-001',
-    patient: {
-      id: 'P001',
-      name: 'Ramesh Kumar',
-      age: 45,
-      gender: 'Male',
-      mobile: '9876543201',
-      patientID: 'PID001',
-    },
-    tests: [
-      {
-        id: 'TEST001',
-        testCode: 'CBC',
-        testName: 'Complete Blood Count',
-        sampleType: 'Blood',
-        sampleVolume: 2,
-        containerType: 'EDTA Tube',
-        tubeType: 'EDTA',
-        fastingRequired: false,
-        reportTime: '24 hours',
-      },
-    ],
-    bookingType: 'WalkIn',
-    bookingTime: new Date(now.getTime() - 45 * 60000).toISOString(),
-    bookingDate: format(now, 'yyyy-MM-dd'),
-    status: 'Pending',
-    priority: 'Normal',
-    sampleRequirements: [],
-    type: 'Lab',
-  });
+  for (let i = 0; i < count; i++) {
+    const bookingTime = new Date(now.getTime() - Math.random() * 120 * 60000); // 0-120 mins ago
+    const waitingMinutes = Math.floor((now.getTime() - bookingTime.getTime()) / 60000);
+    const priority = Math.random() > 0.85 ? 'STAT' : Math.random() > 0.7 ? 'Urgent' : 'Normal';
 
-  // Sample 2: Urgent
-  collections.push({
-    id: 'C002',
-    tokenNumber: 'T-2024-002',
-    sampleID: 'S-2024-002',
-    bookingID: 'B-002',
-    patient: {
-      id: 'P002',
-      name: 'Priya Sharma',
-      age: 32,
-      gender: 'Female',
-      mobile: '9876543202',
-      patientID: 'PID002',
-    },
-    tests: [
-      {
-        id: 'TEST002',
-        testCode: 'GLUC',
-        testName: 'Fasting Blood Sugar',
-        sampleType: 'Blood',
-        sampleVolume: 1,
-        containerType: 'Fluoride Tube',
-        tubeType: 'Fluoride',
-        fastingRequired: true,
-        reportTime: '4 hours',
-      },
-      {
-        id: 'TEST003',
-        testCode: 'HBA1C',
-        testName: 'HbA1c',
-        sampleType: 'Blood',
-        sampleVolume: 2,
-        containerType: 'EDTA Tube',
-        tubeType: 'EDTA',
-        fastingRequired: false,
-        reportTime: '24 hours',
-      },
-    ],
-    bookingType: 'Scheduled',
-    bookingTime: new Date(now.getTime() - 20 * 60000).toISOString(),
-    bookingDate: format(now, 'yyyy-MM-dd'),
-    status: 'Pending',
-    priority: 'Urgent',
-    specialInstructions: 'Patient is fasting for 12 hours',
-    sampleRequirements: [],
-    type: 'Lab',
-  });
-
-  // Sample 3: Normal
-  collections.push({
-    id: 'C003',
-    tokenNumber: 'T-2024-003',
-    sampleID: 'S-2024-003',
-    bookingID: 'B-003',
-    patient: {
-      id: 'P003',
-      name: 'Amit Patel',
-      age: 28,
-      gender: 'Male',
-      mobile: '9876543203',
-      patientID: 'PID003',
-    },
-    tests: [
-      {
-        id: 'TEST004',
-        testCode: 'LFT',
-        testName: 'Liver Function Test',
-        sampleType: 'Blood',
-        sampleVolume: 3,
-        containerType: 'Gel Tube',
-        tubeType: 'Gel',
-        fastingRequired: true,
-        reportTime: '24 hours',
-      },
-    ],
-    bookingType: 'WalkIn',
-    bookingTime: new Date(now.getTime() - 10 * 60000).toISOString(),
-    bookingDate: format(now, 'yyyy-MM-dd'),
-    status: 'Pending',
-    priority: 'Normal',
-    sampleRequirements: [],
-    type: 'Lab',
-  });
-
-  // Add more dummy collections
-  for (let i = 4; i <= 30; i++) {
-    const bookingMinutesAgo = Math.floor(Math.random() * 60) + 5;
     collections.push({
-      id: `C${String(i).padStart(3, '0')}`,
-      tokenNumber: `T-2024-${String(i).padStart(3, '0')}`,
-      sampleID: `S-2024-${String(i).padStart(3, '0')}`,
-      bookingID: `B-${String(i).padStart(3, '0')}`,
-      patient: {
-        id: `P${String(i).padStart(3, '0')}`,
-        name: `Patient ${i}`,
-        age: Math.floor(Math.random() * 60) + 20,
-        gender: i % 2 === 0 ? 'Female' : 'Male',
-        mobile: `98765432${String(i).padStart(2, '0')}`,
-        patientID: `PID${String(i).padStart(3, '0')}`,
-      },
-      tests: [
-        {
-          id: `TEST${String(i).padStart(3, '0')}`,
-          testCode: ['CBC', 'GLUC', 'LFT', 'KFT', 'LIPID'][i % 5],
-          testName: ['Complete Blood Count', 'Blood Sugar', 'Liver Function Test', 'Kidney Function Test', 'Lipid Profile'][i % 5],
-          sampleType: 'Blood',
-          sampleVolume: 2,
-          containerType: 'EDTA Tube',
-          tubeType: 'EDTA',
-          fastingRequired: i % 3 === 0,
-          reportTime: '24 hours',
-        },
-      ],
-      bookingType: i % 2 === 0 ? 'WalkIn' : 'Scheduled',
-      bookingTime: new Date(now.getTime() - bookingMinutesAgo * 60000).toISOString(),
-      bookingDate: format(now, 'yyyy-MM-dd'),
-      status: 'Pending',
-      priority: i % 10 === 0 ? 'Urgent' : 'Normal',
-      sampleRequirements: [],
-      type: 'Lab',
+      id: `coll-${i + 1}`,
+      tokenNumber: `TKN-${String(i + 1).padStart(4, '0')}`,
+      sampleId: `SMP-20260204-${String(i + 1).padStart(4, '0')}`,
+      patientName: `Patient ${i + 1}`,
+      age: Math.floor(Math.random() * 80) + 18,
+      gender: Math.random() > 0.5 ? 'M' : 'F',
+      mobile: `98${String(Math.floor(Math.random() * 1000000000)).padStart(8, '0')}`,
+      tests: testOptions.slice(0, Math.floor(Math.random() * 3) + 1) as any,
+      sampleTypesRequired: ['Blood'],
+      bookingTime: bookingTime,
+      waitingMinutes,
+      bookingType: Math.random() > 0.3 ? 'Walk-in' : 'Scheduled',
+      status: 'Pending Collection' as CollectionStatus,
+      priority: priority as Priority,
+      createdAt: bookingTime,
+      updatedAt: new Date(),
     });
   }
 
   return collections;
-}
+};
 
-function getDummyHomeCollections(): HomeCollection[] {
+const generateMockHomeCollections = (count: number): HomeCollection[] => {
+  const areas = ['Andheri', 'Dadar', 'Bandra', 'Powai', 'Colaba', 'Juhu', 'Kemps Corner', 'Mulund'];
+  const statuses = ['Pending Assignment', 'Assigned', 'In Progress', 'Collected', 'Cancelled'];
+  const timeSlots = ['6-9 AM', '9-12 PM', '12-3 PM', '3-6 PM'];
+
   const collections: HomeCollection[] = [];
-  const now = new Date();
 
-  const areas = ['Koramangala', 'Indiranagar', 'Whitefield', 'HSR Layout', 'Jayanagar', 'Marathahalli'];
-  const addresses = [
-    '#123, 1st Cross, 5th Block',
-    'Flat 402, Green Apartments',
-    'House No. 567, 2nd Main',
-    '#89, Villa Gardens',
-    'Plot 234, Sector 4',
-  ];
-
-  for (let i = 1; i <= 15; i++) {
-    const area = areas[i % areas.length];
-    const address = addresses[i % addresses.length];
-    const status: HomeCollectionStatus = 
-      i <= 3 ? 'PendingAssignment' : 
-      i <= 6 ? 'Assigned' : 
-      i <= 9 ? 'InProgress' : 
-      i <= 12 ? 'Collected' : 
-      'Cancelled';
-
+  for (let i = 0; i < count; i++) {
     collections.push({
-      id: `HC${String(i).padStart(3, '0')}`,
-      tokenNumber: `HT-2024-${String(i).padStart(3, '0')}`,
-      sampleID: `HS-2024-${String(i).padStart(3, '0')}`,
-      bookingID: `HB-${String(i).padStart(3, '0')}`,
-      patient: {
-        id: `HP${String(i).padStart(3, '0')}`,
-        name: `Home Patient ${i}`,
-        age: Math.floor(Math.random() * 60) + 20,
-        gender: i % 2 === 0 ? 'Female' : 'Male',
-        mobile: `98765432${String(i + 50).padStart(2, '0')}`,
-        patientID: `HPID${String(i).padStart(3, '0')}`,
-        address: `${address}, ${area}`,
-      },
-      tests: [
-        {
-          id: `HTEST${String(i).padStart(3, '0')}`,
-          testCode: ['CBC', 'GLUC', 'LFT'][i % 3],
-          testName: ['Complete Blood Count', 'Blood Sugar', 'Liver Function Test'][i % 3],
-          sampleType: 'Blood',
-          sampleVolume: 2,
-          containerType: 'EDTA Tube',
-          tubeType: 'EDTA',
-          fastingRequired: i % 2 === 0,
-          reportTime: '24 hours',
-        },
-      ],
+      id: `home-${i + 1}`,
+      tokenNumber: `HOME-${String(i + 1).padStart(4, '0')}`,
+      sampleId: `SMP-HOME-${i + 1}`,
+      patientName: `Home Patient ${i + 1}`,
+      mobile: `98${String(Math.floor(Math.random() * 1000000000)).padStart(8, '0')}`,
+      area: areas[Math.floor(Math.random() * areas.length)],
+      address: `${i + 1}, Example Street, City`,
+      preferredDate: new Date(Date.now() + Math.random() * 7 * 24 * 60 * 60000).toISOString(),
+      preferredTimeSlot: timeSlots[Math.floor(Math.random() * timeSlots.length)],
+      status: statuses[Math.floor(Math.random() * statuses.length)] as HomeCollectionStatus,
+      tests: ['CBC', 'Blood Sugar'] as any,
+      bookingTime: new Date(),
       bookingType: 'Scheduled',
-      bookingTime: new Date(now.getTime() + i * 3600000).toISOString(),
-      bookingDate: format(new Date(now.getTime() + i * 86400000), 'yyyy-MM-dd'),
-      status: 'Pending',
       priority: 'Normal',
-      sampleRequirements: [],
-      type: 'Home',
-      address: `${address}, ${area}`,
-      area,
-      locality: area,
-      preferredDate: format(new Date(now.getTime() + i * 86400000), 'yyyy-MM-dd'),
-      preferredTimeSlot: TIME_SLOTS[i % TIME_SLOTS.length],
-      homeCollectionStatus: status,
-      distance: Math.floor(Math.random() * 15) + 2,
-      latitude: 12.9716 + (Math.random() - 0.5) * 0.1,
-      longitude: 77.5946 + (Math.random() - 0.5) * 0.1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
   }
 
   return collections;
+};
+
+// ============= COMPONENTS =============
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
 }
 
-function getDummyCollectedSamples(): Collection[] {
-  const collections: Collection[] = [];
-  const now = new Date();
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
 
-  for (let i = 1; i <= 48; i++) {
-    const collectedMinutesAgo = Math.floor(Math.random() * 240) + 10;
-    collections.push({
-      id: `COL${String(i).padStart(3, '0')}`,
-      tokenNumber: `T-2024-${String(i + 100).padStart(3, '0')}`,
-      sampleID: `S-2024-${String(i + 100).padStart(3, '0')}`,
-      bookingID: `B-${String(i + 100).padStart(3, '0')}`,
-      patient: {
-        id: `P${String(i + 100).padStart(3, '0')}`,
-        name: `Collected Patient ${i}`,
-        age: Math.floor(Math.random() * 60) + 20,
-        gender: i % 2 === 0 ? 'Female' : 'Male',
-        mobile: `98765433${String(i).padStart(2, '0')}`,
-        patientID: `PID${String(i + 100).padStart(3, '0')}`,
-      },
-      tests: [
-        {
-          id: `TEST${String(i + 100).padStart(3, '0')}`,
-          testCode: ['CBC', 'GLUC', 'LFT', 'KFT'][i % 4],
-          testName: ['Complete Blood Count', 'Blood Sugar', 'Liver Function Test', 'Kidney Function Test'][i % 4],
-          sampleType: 'Blood',
-          sampleVolume: 2,
-          containerType: 'EDTA Tube',
-          tubeType: 'EDTA',
-          fastingRequired: i % 2 === 0,
-          reportTime: '24 hours',
-        },
-      ],
-      bookingType: i % 2 === 0 ? 'WalkIn' : 'Scheduled',
-      bookingTime: new Date(now.getTime() - (collectedMinutesAgo + 30) * 60000).toISOString(),
-      bookingDate: format(now, 'yyyy-MM-dd'),
-      status: 'Collected',
-      priority: 'Normal',
-      sampleRequirements: [],
-      type: 'Lab',
-      collectedAt: new Date(now.getTime() - collectedMinutesAgo * 60000).toISOString(),
-      collectedBy: getDummyCollectors()[i % 5].name,
-    });
-  }
-
-  return collections;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ py: 2 }}>{children}</Box>}
+    </div>
+  );
 }
 
-function getDummyQualityIssues(): QualityIssue[] {
-  return [
-    {
-      id: 'QI001',
-      sampleID: 'S-2024-045',
-      tokenNumber: 'T-2024-045',
-      patientName: 'Suresh Kumar',
-      issueType: 'Hemolyzed',
-      description: 'Sample appears hemolyzed, possibly due to difficult venipuncture',
-      collectedBy: 'Rajesh Kumar',
-      reportedBy: 'Lab Supervisor',
-      reportedAt: new Date().toISOString(),
-      status: 'Open',
+// Stats Card Component
+const StatsCard: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  color: string;
+  onClick?: () => void;
+}> = ({ icon, label, count, color, onClick }) => (
+  <Card
+    onClick={onClick}
+    sx={{
+      cursor: onClick ? 'pointer' : 'default',
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      '&:hover': onClick ? { transform: 'translateY(-4px)', boxShadow: 3 } : {},
+      backgroundColor: color === '#4CAF50' ? '#f1f8e9' : color === '#FF9800' ? '#fff3e0' : color === '#2196F3' ? '#e3f2fd' : '#ffebee',
+    }}
+  >
+    <CardContent>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ fontSize: 32, opacity: 0.8 }}>{icon}</Box>
+        <Box>
+          <Typography color="textSecondary" variant="body2" sx={{ fontWeight: 500 }}>
+            {label}
+          </Typography>
+          <Typography variant="h5" sx={{ fontWeight: 'bold', color }}>
+            {count}
+          </Typography>
+        </Box>
+      </Box>
+    </CardContent>
+  </Card>
+);
+
+// Collect Sample Dialog Component
+const CollectSampleDialog: React.FC<{
+  open: boolean;
+  collection: Collection | null;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+}> = ({ open, collection, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    collectorName: '',
+    quality: 'Good',
+    tubeType: 'EDTA Tube',
+    numberOfTubes: 1,
+    volume: '',
+    notes: '',
+    printLabels: true,
+    labelsCount: 1,
+    fasting: 'NotApplicable',
+    patientCondition: 'Normal',
+    collectionSite: 'LeftArm',
+    checklist: {
+      patientVerified: false,
+      tubeCorrect: false,
+      volumeAdequate: false,
+      labelApplied: false,
+      sampleMixed: false,
+      temperatureCorrect: false,
+      patientInformed: false,
+      instructionsGiven: false,
     },
-    {
-      id: 'QI002',
-      sampleID: 'S-2024-067',
-      tokenNumber: 'T-2024-067',
-      patientName: 'Anjali Verma',
-      issueType: 'Insufficient',
-      description: 'Insufficient sample volume for all requested tests',
-      collectedBy: 'Priya Sharma',
-      reportedBy: 'Testing Department',
-      reportedAt: new Date(Date.now() - 3600000).toISOString(),
-      status: 'ReCollectionRequested',
-    },
-  ];
-}
+  });
+
+  const allChecked = Object.values(formData.checklist).every(v => v === true);
+
+  const handleChecklistChange = (key: keyof typeof formData.checklist) => {
+    setFormData(prev => ({
+      ...prev,
+      checklist: {
+        ...prev.checklist,
+        [key]: !prev.checklist[key],
+      }
+    }));
+  };
+
+  const handleSubmit = () => {
+    if (!formData.collectorName || !formData.volume) {
+      alert('Please fill all required fields');
+      return;
+    }
+
+    if (!allChecked) {
+      alert('Please complete all quality checks');
+      return;
+    }
+
+    onSubmit(formData);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <ReceiptIcon />
+        Collect Sample - {collection?.tokenNumber}
+      </DialogTitle>
+      <DialogContent dividers>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          {/* Patient Info Card */}
+          <Card variant="outlined" sx={{ bgcolor: '#f5f5f5' }}>
+            <CardContent>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ width: 50, height: 50, bgcolor: '#2196F3' }}>
+                  {collection?.patientName[0]}
+                </Avatar>
+                <Box flex={1}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                    {collection?.patientName}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {collection?.age}Y / {collection?.gender} | Token: {collection?.tokenNumber}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {collection?.mobile}
+                  </Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Divider />
+
+          {/* Collection Form */}
+          <TextField
+            fullWidth
+            label="Collector Name"
+            value={formData.collectorName}
+            onChange={(e) => setFormData(prev => ({ ...prev, collectorName: e.target.value }))}
+            required
+            size="small"
+          />
+
+          <Grid container spacing={1}>
+            <Grid item xs={12} sm={6}>
+              <Select
+                fullWidth
+                value={formData.tubeType}
+                onChange={(e) => setFormData(prev => ({ ...prev, tubeType: e.target.value }))}
+                size="small"
+              >
+                <MenuItem value="EDTA Tube">EDTA Tube (Purple)</MenuItem>
+                <MenuItem value="Plain Tube">Plain Tube (Red)</MenuItem>
+                <MenuItem value="Fluoride Tube">Fluoride Tube (Gray)</MenuItem>
+              </Select>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Number of Tubes"
+                type="number"
+                value={formData.numberOfTubes}
+                onChange={(e) => setFormData(prev => ({ ...prev, numberOfTubes: parseInt(e.target.value) }))}
+                size="small"
+                inputProps={{ min: 1, max: 10 }}
+              />
+            </Grid>
+          </Grid>
+
+          <TextField
+            fullWidth
+            label="Volume Collected (ml)"
+            type="number"
+            value={formData.volume}
+            onChange={(e) => setFormData(prev => ({ ...prev, volume: e.target.value }))}
+            required
+            size="small"
+          />
+
+          <FormControl fullWidth size="small">
+            <FormLabel sx={{ mb: 1 }}>Sample Quality</FormLabel>
+            <RadioGroup
+              value={formData.quality}
+              onChange={(e) => setFormData(prev => ({ ...prev, quality: e.target.value }))}
+              row
+            >
+              <FormControlLabel value="Good" control={<Radio />} label="✅ Good" />
+              <FormControlLabel value="Hemolyzed" control={<Radio />} label="⚠️ Hemolyzed" />
+              <FormControlLabel value="Clotted" control={<Radio />} label="⚠️ Clotted" />
+              <FormControlLabel value="Contaminated" control={<Radio />} label="❌ Contaminated" />
+            </RadioGroup>
+          </FormControl>
+
+          {formData.quality !== 'Good' && (
+            <TextField
+              fullWidth
+              label="Quality Notes"
+              multiline
+              rows={2}
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="Explain the quality issue"
+              required
+              size="small"
+            />
+          )}
+
+          <Select
+            fullWidth
+            value={formData.fasting}
+            onChange={(e) => setFormData(prev => ({ ...prev, fasting: e.target.value }))}
+            size="small"
+          >
+            <MenuItem value="Fasting">Fasting</MenuItem>
+            <MenuItem value="NonFasting">Non-Fasting</MenuItem>
+            <MenuItem value="NotApplicable">Not Applicable</MenuItem>
+          </Select>
+
+          <Select
+            fullWidth
+            value={formData.patientCondition}
+            onChange={(e) => setFormData(prev => ({ ...prev, patientCondition: e.target.value }))}
+            size="small"
+          >
+            <MenuItem value="Normal">Normal</MenuItem>
+            <MenuItem value="Anxious">Anxious</MenuItem>
+            <MenuItem value="DifficultVeinAccess">Difficult Vein Access</MenuItem>
+            <MenuItem value="Pediatric">Pediatric</MenuItem>
+            <MenuItem value="Other">Other</MenuItem>
+          </Select>
+
+          {/* Quality Checklist */}
+          <Alert severity="info" icon={<VerifiedIcon />}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+              Quality Checklist (All required)
+            </Typography>
+            <FormGroup size="small">
+              {Object.entries(formData.checklist).map(([key, value]) => (
+                <FormControlLabel
+                  key={key}
+                  control={
+                    <Checkbox
+                      checked={value}
+                      onChange={() => handleChecklistChange(key as any)}
+                      size="small"
+                    />
+                  }
+                  label={key.replace(/([A-Z])/g, ' $1').trim()}
+                  sx={{ fontSize: '0.9rem' }}
+                />
+              ))}
+            </FormGroup>
+          </Alert>
+
+          {/* Label Printing */}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formData.printLabels}
+                onChange={(e) => setFormData(prev => ({ ...prev, printLabels: e.target.checked }))}
+              />
+            }
+            label="Print Labels Now"
+          />
+          {formData.printLabels && (
+            <TextField
+              fullWidth
+              label="Number of Labels"
+              type="number"
+              value={formData.labelsCount}
+              onChange={(e) => setFormData(prev => ({ ...prev, labelsCount: parseInt(e.target.value) }))}
+              inputProps={{ min: 1, max: 10 }}
+              size="small"
+            />
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          color="success"
+          startIcon={<CheckCircleIcon />}
+          disabled={!formData.collectorName || !formData.volume || !allChecked}
+        >
+          Mark as Collected
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+// Barcode Scanner Dialog
+const BarcodeScannerDialog: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  onScan: (barcode: string) => void;
+}> = ({ open, onClose, onScan }) => {
+  const [manualInput, setManualInput] = useState('');
+
+  const handleManualScan = () => {
+    if (manualInput.trim()) {
+      onScan(manualInput);
+      setManualInput('');
+      onClose();
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <QrCodeScannerIcon />
+        Scan Sample Barcode
+      </DialogTitle>
+      <DialogContent dividers>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Alert severity="info">
+            Camera scanning requires browser permission. Use manual entry as fallback.
+          </Alert>
+
+          <TextField
+            fullWidth
+            label="Or Enter Sample ID Manually"
+            placeholder="SMP-20260204-0001"
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleManualScan();
+              }
+            }}
+            autoFocus
+            size="small"
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={handleManualScan} variant="contained" color="primary">
+          Process
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+// ============= MAIN COMPONENT =============
 
 export default function SampleCollectionPage() {
-  // State Management
   const [activeTab, setActiveTab] = useState(0);
   const [pendingCollections, setPendingCollections] = useState<Collection[]>([]);
   const [homeCollections, setHomeCollections] = useState<HomeCollection[]>([]);
-  const [collectedSamples, setCollectedSamples] = useState<Collection[]>([]);
-  const [collectors, setCollectors] = useState<Collector[]>([]);
-  const [qualityIssues, setQualityIssues] = useState<QualityIssue[]>([]);
-
-  // Dialog states
-  const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
-  const [batchCollectionDialogOpen, setBatchCollectionDialogOpen] = useState(false);
-  const [assignCollectorDialogOpen, setAssignCollectorDialogOpen] = useState(false);
-  const [routePlanningDialogOpen, setRoutePlanningDialogOpen] = useState(false);
-  const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
-  const [qualityIssuesDialogOpen, setQualityIssuesDialogOpen] = useState(false);
-  const [collectedViewDialogOpen, setCollectedViewDialogOpen] = useState(false);
-
-  // Selected data
+  const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [openCollectDialog, setOpenCollectDialog] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
-  const [selectedHomeCollection, setSelectedHomeCollection] = useState<HomeCollection | null>(null);
-  const [bulkSelected, setBulkSelected] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
+  const [openScannerDialog, setOpenScannerDialog] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as const });
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Collection form data
-  const [collectionFormData, setCollectionFormData] = useState<CollectionFormData>({
-    collectorID: '',
-    collectorName: '',
-    collectionDate: format(new Date(), 'yyyy-MM-dd'),
-    collectionTime: format(new Date(), 'HH:mm'),
-    samples: [],
-    fastingStatus: 'NotApplicable',
-    patientCondition: 'Normal',
-    printLabels: true,
-    numberOfLabels: 1,
-    qualityChecklist: {
-      patientVerified: false,
-      correctTube: false,
-      adequateVolume: false,
-      labelApplied: false,
-      storedProperly: false,
-      patientInformed: false,
-    },
-    department: 'Hematology',
-    priority: 'Normal',
-  });
-
-  // Filters
-  const [labFilters, setLabFilters] = useState({
-    search: '',
-    status: 'All',
-    type: 'All',
-    time: 'All',
-    sort: 'Time',
-  });
-
-  const [homeFilters, setHomeFilters] = useState({
-    search: '',
-    status: 'All',
-    date: 'All',
-    area: 'All',
-    collector: 'All',
-  });
-
-  // Assign collector data
-  const [assignData, setAssignData] = useState<Partial<AssignCollectorData>>({
-    collectorID: '',
-    scheduledTime: '',
-    estimatedDuration: 30,
-    specialInstructions: '',
-    notifyCollector: true,
-    notifyPatient: true,
-  });
-
-  // Snackbar
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error' | 'info' | 'warning',
-  });
-
-  // Statistics
-  const [stats, setStats] = useState({
-    pendingCollections: 15,
-    todaysCollections: 48,
-    homePending: 8,
-    qualityIssues: 2,
-  });
-
-  // Load initial data
+  // Initialize mock data
   useEffect(() => {
-    loadData();
+    setLoading(true);
+    setTimeout(() => {
+      const collections = generateMockCollections(45);
+      const homeCollectionsList = generateMockHomeCollections(15);
+      setPendingCollections(collections);
+      setHomeCollections(homeCollectionsList);
+      setLoading(false);
+    }, 500);
   }, []);
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh
   useEffect(() => {
+    if (!autoRefresh) return;
+
     const interval = setInterval(() => {
-      refreshData();
-    }, 30000);
+      setPendingCollections((prev) =>
+        prev.map((c) => ({
+          ...c,
+          waitingMinutes: Math.floor((new Date().getTime() - new Date(c.bookingTime).getTime()) / 60000),
+        }))
+      );
+    }, 60000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [autoRefresh]);
 
-  const loadData = () => {
-    setPendingCollections(getDummyPendingCollections());
-    setHomeCollections(getDummyHomeCollections());
-    setCollectedSamples(getDummyCollectedSamples());
-    setCollectors(getDummyCollectors());
-    setQualityIssues(getDummyQualityIssues());
-    updateStatistics();
+  // Filter collections
+  const filteredCollections = pendingCollections.filter((c) => {
+    const query = searchQuery.toLowerCase();
+    const matchesSearch =
+      c.tokenNumber.toLowerCase().includes(query) ||
+      c.patientName.toLowerCase().includes(query) ||
+      c.sampleId.toLowerCase().includes(query) ||
+      c.mobile.includes(query);
+
+    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+    const matchesType = typeFilter === 'all' || c.bookingType === typeFilter;
+
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const stats = {
+    pending: pendingCollections.length,
+    today: Math.floor(pendingCollections.length * 0.5),
+    homeCollectionsPending: homeCollections.filter(c => c.status === 'Pending Assignment').length,
+    qualityIssues: 2,
+    overdue: pendingCollections.filter(c => (c.waitingMinutes || 0) > 30).length,
   };
 
-  const refreshData = () => {
-    // Simulate data refresh
-    updateStatistics();
-  };
-
-  const updateStatistics = () => {
-    const pending = pendingCollections.filter(c => c.status === 'Pending').length;
-    const homePending = homeCollections.filter(c => c.homeCollectionStatus === 'PendingAssignment').length;
-    setStats({
-      pendingCollections: pending,
-      todaysCollections: collectedSamples.length,
-      homePending,
-      qualityIssues: qualityIssues.length,
-    });
-  };
-
-  // Collection Dialog Handlers
-  const handleCollectNow = (collection: Collection) => {
+  const handleCollectClick = (collection: Collection) => {
     setSelectedCollection(collection);
-    
-    // Initialize form with sample requirements
-    const requirements = getSampleRequirements(collection.tests);
-    const samples: SampleDetail[] = requirements.map((req, index) => ({
-      id: `sample-${index}`,
-      sampleType: req.sampleType,
-      tubeType: req.tubeType,
-      numberOfTubes: req.count,
-      volumeCollected: req.volume,
-      quality: 'Good',
-    }));
-
-    setCollectionFormData({
-      ...collectionFormData,
-      samples,
-      fastingStatus: collection.tests.some(t => t.fastingRequired) ? 'NotApplicable' : 'NotApplicable',
-      department: getDepartmentForTests(collection.tests),
-      numberOfLabels: samples.length,
-    });
-
-    setCollectionDialogOpen(true);
+    setOpenCollectDialog(true);
   };
 
-  const handleSubmitCollection = () => {
-    // Validate form
-    const validation = validateCollectionForm(collectionFormData);
-    if (!validation.isValid) {
-      setSnackbar({
-        open: true,
-        message: 'Please fill all required fields',
-        severity: 'error',
-      });
-      return;
-    }
-
-    // Check quality checklist
-    if (!validateQualityChecklist(collectionFormData.qualityChecklist)) {
-      setSnackbar({
-        open: true,
-        message: 'Please complete the quality checklist',
-        severity: 'error',
-      });
-      return;
-    }
-
-    // Update collection status
-    if (selectedCollection) {
-      const updatedCollection = {
-        ...selectedCollection,
-        status: 'Collected' as CollectionStatus,
-        collectedAt: new Date().toISOString(),
-        collectedBy: collectionFormData.collectorName,
-        collectionData: collectionFormData,
-      };
-
-      // Remove from pending and add to collected
-      setPendingCollections(prev => prev.filter(c => c.id !== selectedCollection.id));
-      setCollectedSamples(prev => [updatedCollection, ...prev]);
-
-      // Send SMS
-      const smsMessage = generateCollectionSMS({
-        patientName: selectedCollection.patient.name,
-        sampleID: selectedCollection.sampleID,
-        reportTime: getReportReadyTime(selectedCollection.tests),
-      });
-
-      // Print labels if requested
-      if (collectionFormData.printLabels) {
-        console.log('Printing labels...');
-      }
-
-      setSnackbar({
-        open: true,
-        message: 'Sample collected successfully!',
-        severity: 'success',
-      });
-
-      setCollectionDialogOpen(false);
-      updateStatistics();
-    }
-  };
-
-  // Assign Collector Handler
-  const handleAssignCollector = () => {
-    if (!selectedHomeCollection || !assignData.collectorID || !assignData.scheduledTime) {
-      setSnackbar({
-        open: true,
-        message: 'Please fill all required fields',
-        severity: 'error',
-      });
-      return;
-    }
-
-    const selectedCollector = collectors.find(c => c.id === assignData.collectorID);
-    if (!selectedCollector) return;
-
-    // Update home collection
-    const updated = homeCollections.map(hc => {
-      if (hc.id === selectedHomeCollection.id) {
-        return {
-          ...hc,
-          homeCollectionStatus: 'Assigned' as HomeCollectionStatus,
-          assignedCollector: selectedCollector,
-          scheduledTime: assignData.scheduledTime,
-        };
-      }
-      return hc;
-    });
-
-    setHomeCollections(updated);
-
-    // Send SMS notifications
-    if (assignData.notifyPatient) {
-      const patientSMS = `Home collection scheduled for ${formatDate(assignData.scheduledTime!)} at ${formatTime(assignData.scheduledTime!)}. Collector: ${selectedCollector.name}, Mobile: ${selectedCollector.mobile}`;
-      console.log('SMS to patient:', patientSMS);
-    }
-
-    if (assignData.notifyCollector) {
-      const collectorSMS = generateCollectorSMS({
-        collectorName: selectedCollector.name,
-        patientName: selectedHomeCollection.patient.name,
-        address: selectedHomeCollection.address,
-        time: formatTime(assignData.scheduledTime!),
-        mobile: selectedHomeCollection.patient.mobile,
-      });
-      console.log('SMS to collector:', collectorSMS);
-    }
-
+  const handleCollectSubmit = (data: any) => {
     setSnackbar({
       open: true,
-      message: 'Collector assigned successfully!',
+      message: `Sample ${selectedCollection?.tokenNumber} marked as collected successfully`,
       severity: 'success',
     });
-
-    setAssignCollectorDialogOpen(false);
-    updateStatistics();
+    setPendingCollections((prev) =>
+      prev.filter((c) => c.id !== selectedCollection?.id)
+    );
   };
 
-  // Lab Collection DataGrid Columns
-  const labCollectionColumns: GridColDef[] = [
-    {
-      field: 'priority',
-      headerName: 'Priority',
-      width: 80,
-      renderCell: (params) => (
-        params.row.priority === 'Urgent' || params.row.priority === 'STAT' ? (
-          <Tooltip title="Urgent">
-            <WarningIcon color="error" />
-          </Tooltip>
-        ) : null
-      ),
-    },
-    {
-      field: 'tokenNumber',
-      headerName: 'Token',
-      width: 130,
-      renderCell: (params) => (
-        <Typography variant="body2" fontWeight="bold">
-          {params.row.tokenNumber}
-        </Typography>
-      ),
-    },
-    {
-      field: 'sampleID',
-      headerName: 'Sample ID',
-      width: 130,
-    },
-    {
-      field: 'patientName',
-      headerName: 'Patient Name',
-      width: 150,
-      valueGetter: (value, row) => row.patient.name,
-    },
-    {
-      field: 'ageGender',
-      headerName: 'Age / Gender',
-      width: 120,
-      valueGetter: (value, row) => `${row.patient.age} / ${row.patient.gender.charAt(0)}`,
-    },
-    {
-      field: 'mobile',
-      headerName: 'Mobile',
-      width: 120,
-      valueGetter: (value, row) => row.patient.mobile,
-    },
-    {
-      field: 'tests',
-      headerName: 'Tests',
-      width: 180,
-      renderCell: (params) => {
-        const testNames = params.row.tests.map((t: any) => t.testName).join(', ');
-        return (
-          <Tooltip title={testNames}>
-            <Typography variant="body2" noWrap>
-              {testNames}
-            </Typography>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      field: 'sampleType',
-      headerName: 'Sample Type',
-      width: 120,
-      renderCell: (params) => (
-        <Chip label={params.row.tests[0].sampleType} size="small" color="primary" />
-      ),
-    },
-    {
-      field: 'bookingTime',
-      headerName: 'Booking Time',
-      width: 100,
-      valueGetter: (value, row) => formatTime(row.bookingTime),
-    },
-    {
-      field: 'waitingTime',
-      headerName: 'Waiting Time',
-      width: 120,
-      renderCell: (params) => {
-        const waitTime = calculateWaitingTime(params.row.bookingTime);
-        const isOverdueStatus = isOverdue(params.row.bookingTime);
-        return (
-          <Typography
-            variant="body2"
-            color={isOverdueStatus ? 'error' : 'textPrimary'}
-            fontWeight={isOverdueStatus ? 'bold' : 'normal'}
-          >
-            {waitTime}
-          </Typography>
-        );
-      },
-    },
-    {
-      field: 'bookingType',
-      headerName: 'Type',
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.row.bookingType === 'WalkIn' ? 'Walk-in' : 'Scheduled'}
-          size="small"
-          color={params.row.bookingType === 'WalkIn' ? 'default' : 'info'}
-        />
-      ),
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.row.status}
-          size="small"
-          sx={{ bgcolor: STATUS_COLORS[params.row.status as CollectionStatus], color: 'white' }}
-        />
-      ),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 200,
-      renderCell: (params) => (
-        <Stack direction="row" spacing={0.5}>
-          <Button
-            size="small"
-            variant="contained"
-            color="success"
-            onClick={() => handleCollectNow(params.row)}
-          >
-            Collect
-          </Button>
-          <Tooltip title="Call Patient">
-            <IconButton size="small" color="primary" href={`tel:${params.row.patient.mobile}`}>
-              <PhoneIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      ),
-    },
-  ];
+  const handleSelectCollection = (id: string) => {
+    const newSelected = new Set(selectedCollections);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedCollections(newSelected);
+  };
 
-  // Home Collection DataGrid Columns
-  const homeCollectionColumns: GridColDef[] = [
-    {
-      field: 'tokenNumber',
-      headerName: 'Token',
-      width: 130,
-    },
-    {
-      field: 'patientName',
-      headerName: 'Patient Name',
-      width: 150,
-      valueGetter: (value, row) => row.patient.name,
-    },
-    {
-      field: 'mobile',
-      headerName: 'Mobile',
-      width: 120,
-      valueGetter: (value, row) => row.patient.mobile,
-    },
-    {
-      field: 'address',
-      headerName: 'Address',
-      width: 200,
-      renderCell: (params) => (
-        <Tooltip title={params.row.address}>
-          <Typography variant="body2" noWrap>
-            {params.row.address}
-          </Typography>
-        </Tooltip>
-      ),
-    },
-    {
-      field: 'area',
-      headerName: 'Area',
-      width: 120,
-    },
-    {
-      field: 'tests',
-      headerName: 'Tests',
-      width: 150,
-      renderCell: (params) => {
-        const testNames = params.row.tests.map((t: any) => t.testName).join(', ');
-        return (
-          <Tooltip title={testNames}>
-            <Typography variant="body2" noWrap>
-              {testNames}
-            </Typography>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      field: 'preferredDate',
-      headerName: 'Preferred Date',
-      width: 120,
-      valueGetter: (value, row) => formatDate(row.preferredDate),
-    },
-    {
-      field: 'preferredTimeSlot',
-      headerName: 'Time Slot',
-      width: 100,
-    },
-    {
-      field: 'assignedCollector',
-      headerName: 'Assigned To',
-      width: 130,
-      valueGetter: (value, row) => row.assignedCollector?.name || 'Not Assigned',
-    },
-    {
-      field: 'homeCollectionStatus',
-      headerName: 'Status',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.row.homeCollectionStatus}
-          size="small"
-          sx={{ 
-            bgcolor: HOME_COLLECTION_STATUS_COLORS[params.row.homeCollectionStatus as HomeCollectionStatus], 
-            color: 'white' 
-          }}
-        />
-      ),
-    },
-    {
-      field: 'distance',
-      headerName: 'Distance',
-      width: 100,
-      valueGetter: (value, row) => `${row.distance} km`,
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 200,
-      renderCell: (params) => (
-        <Stack direction="row" spacing={0.5}>
-          {params.row.homeCollectionStatus === 'PendingAssignment' && (
-            <Button
-              size="small"
-              variant="contained"
-              color="primary"
-              onClick={() => {
-                setSelectedHomeCollection(params.row);
-                setAssignCollectorDialogOpen(true);
-              }}
-            >
-              Assign
-            </Button>
-          )}
-          <Tooltip title="View on Map">
-            <IconButton
-              size="small"
-              color="primary"
-              href={getGoogleMapsUrl(params.row.address)}
-              target="_blank"
-            >
-              <PlaceIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Call Patient">
-            <IconButton size="small" color="primary" href={`tel:${params.row.patient.mobile}`}>
-              <PhoneIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      ),
-    },
-  ];
+  const handleSelectAll = () => {
+    if (selectedCollections.size === filteredCollections.length) {
+      setSelectedCollections(new Set());
+    } else {
+      setSelectedCollections(new Set(filteredCollections.map((c) => c.id)));
+    }
+  };
 
-  // Apply filters to lab collections
-  const filteredLabCollections = pendingCollections.filter(collection => {
-    if (labFilters.search && !collection.tokenNumber.toLowerCase().includes(labFilters.search.toLowerCase()) &&
-        !collection.patient.name.toLowerCase().includes(labFilters.search.toLowerCase()) &&
-        !collection.sampleID.toLowerCase().includes(labFilters.search.toLowerCase())) {
-      return false;
-    }
-    if (labFilters.status !== 'All' && collection.status !== labFilters.status) {
-      return false;
-    }
-    if (labFilters.type !== 'All' && collection.bookingType !== labFilters.type) {
-      return false;
-    }
-    if (labFilters.time === 'Overdue' && !isOverdue(collection.bookingTime)) {
-      return false;
-    }
-    if (labFilters.time === 'Next 1 Hour' && calculateWaitingMinutes(collection.bookingTime) > 60) {
-      return false;
-    }
-    return true;
-  });
+  const handleExportCSV = () => {
+    const csv = exportCollectionsToCSV(filteredCollections);
+    downloadCSV(csv, `collections-${new Date().toISOString().split('T')[0]}.csv`);
+    setSnackbar({
+      open: true,
+      message: 'Collections exported to CSV successfully',
+      severity: 'success',
+    });
+  };
 
-  // Apply filters to home collections
-  const filteredHomeCollections = homeCollections.filter(collection => {
-    if (homeFilters.search && !collection.tokenNumber.toLowerCase().includes(homeFilters.search.toLowerCase()) &&
-        !collection.patient.name.toLowerCase().includes(homeFilters.search.toLowerCase())) {
-      return false;
+  const handleScan = (barcode: string) => {
+    const collection = pendingCollections.find(
+      (c) => c.sampleId.includes(barcode) || c.tokenNumber.includes(barcode)
+    );
+
+    if (collection) {
+      handleCollectClick(collection);
+      setSnackbar({
+        open: true,
+        message: `Found: ${collection.patientName}`,
+        severity: 'success',
+      });
+    } else {
+      setSnackbar({
+        open: true,
+        message: 'Sample not found in pending collections',
+        severity: 'error',
+      });
     }
-    if (homeFilters.status !== 'All' && collection.homeCollectionStatus !== homeFilters.status) {
-      return false;
-    }
-    if (homeFilters.area !== 'All' && collection.area !== homeFilters.area) {
-      return false;
-    }
-    return true;
-  });
+  };
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  if (loading) {
+    return (
+      <Container>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <Stack alignItems="center" spacing={2}>
+            <CircularProgress />
+            <Typography>Loading collections...</Typography>
+          </Stack>
+        </Box>
+      </Container>
+    );
+  }
+
+  const displayedCollections = filteredCollections.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
-    <DashboardLayout>
-      <Box sx={{ p: 3 }}>
-        {/* Header */}
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4" fontWeight="bold">
-            Sample Collection Management
-          </Typography>
-          <Stack direction="row" spacing={2}>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={refreshData}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<CheckCircleOutlineIcon />}
-              onClick={() => setCollectedViewDialogOpen(true)}
-            >
-              View Collected
-            </Button>
-            <Badge badgeContent={qualityIssues.length} color="error">
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<WarningIcon />}
-                onClick={() => setQualityIssuesDialogOpen(true)}
-              >
-                Quality Issues
-              </Button>
-            </Badge>
-          </Stack>
-        </Stack>
-
-        {/* Quick Stats Cards */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, mb: 3 }}>
-          <Card>
-            <CardContent>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    Pending Collections
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" color="#FF9800">
-                    {stats.pendingCollections}
-                  </Typography>
-                </Box>
-                <HourglassEmptyIcon sx={{ fontSize: 48, color: '#FF9800' }} />
-              </Stack>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    Today&apos;s Collections
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" color="#4CAF50">
-                    {stats.todaysCollections}
-                  </Typography>
-                </Box>
-                <CheckCircleIcon sx={{ fontSize: 48, color: '#4CAF50' }} />
-              </Stack>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    Home Collections Pending
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" color="#2196F3">
-                    {stats.homePending}
-                  </Typography>
-                </Box>
-                <LocalShippingIcon sx={{ fontSize: 48, color: '#2196F3' }} />
-              </Stack>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    Quality Issues
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" color="#F44336">
-                    {stats.qualityIssues}
-                  </Typography>
-                </Box>
-                <WarningIcon sx={{ fontSize: 48, color: '#F44336' }} />
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-
-        {/* Tabs */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-          <Tabs value={activeTab} onChange={(e, val) => setActiveTab(val)}>
-            <Tab label="Lab Collection" />
-            <Tab label="Home Collection" />
-          </Tabs>
-        </Box>
-
-        {/* Lab Collection Tab */}
-        {activeTab === 0 && (
-          <Box>
-            {/* Filters */}
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 2 }}>
-                  <TextField
-                    label="Search"
-                    size="small"
-                    value={labFilters.search}
-                    onChange={(e) => setLabFilters({ ...labFilters, search: e.target.value })}
-                    placeholder="Token, Patient, Sample ID"
-                  />
-                  <FormControl size="small">
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={labFilters.status}
-                      label="Status"
-                      onChange={(e) => setLabFilters({ ...labFilters, status: e.target.value })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      <MenuItem value="Pending">Pending</MenuItem>
-                      <MenuItem value="Collected">Collected</MenuItem>
-                      <MenuItem value="Rejected">Rejected</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small">
-                    <InputLabel>Type</InputLabel>
-                    <Select
-                      value={labFilters.type}
-                      label="Type"
-                      onChange={(e) => setLabFilters({ ...labFilters, type: e.target.value })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      <MenuItem value="WalkIn">Walk-in</MenuItem>
-                      <MenuItem value="Scheduled">Scheduled</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small">
-                    <InputLabel>Time</InputLabel>
-                    <Select
-                      value={labFilters.time}
-                      label="Time"
-                      onChange={(e) => setLabFilters({ ...labFilters, time: e.target.value })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      <MenuItem value="Overdue">Overdue (&gt;30 mins)</MenuItem>
-                      <MenuItem value="Next 1 Hour">Next 1 Hour</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small">
-                    <InputLabel>Sort By</InputLabel>
-                    <Select
-                      value={labFilters.sort}
-                      label="Sort By"
-                      onChange={(e) => setLabFilters({ ...labFilters, sort: e.target.value })}
-                    >
-                      <MenuItem value="Time">Time</MenuItem>
-                      <MenuItem value="Patient">Patient Name</MenuItem>
-                      <MenuItem value="Token">Token Number</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* DataGrid */}
-            <Card>
-              <DataGrid
-                rows={filteredLabCollections}
-                columns={labCollectionColumns}
-                initialState={{
-                  pagination: { paginationModel: { pageSize: 25 } },
-                }}
-                pageSizeOptions={[25, 50, 100]}
-                checkboxSelection
-                onRowSelectionModelChange={(newSelection) => setBulkSelected(newSelection)}
-                getRowClassName={(params) => {
-                  if (isOverdue(params.row.bookingTime)) return 'overdue-row';
-                  if (isUrgent(params.row.bookingTime, params.row.priority)) return 'urgent-row';
-                  return '';
-                }}
-                sx={{
-                  '& .overdue-row': { bgcolor: '#FFEBEE' },
-                  '& .urgent-row': { bgcolor: '#FFF9C4' },
-                  height: 600,
-                }}
-              />
-            </Card>
-
-            {/* Bulk Actions */}
-            {('ids' in bulkSelected && bulkSelected.ids.size > 0) && (
-              <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
-                <Paper elevation={6} sx={{ p: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Typography>{'ids' in bulkSelected && bulkSelected.ids.size} selected</Typography>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      onClick={() => setBatchCollectionDialogOpen(true)}
-                    >
-                      Bulk Collect
-                    </Button>
-                    <Button variant="outlined" startIcon={<PrintIcon />}>
-                      Print Labels
-                    </Button>
-                  </Stack>
-                </Paper>
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* Home Collection Tab */}
-        {activeTab === 1 && (
-          <Box>
-            {/* Filters */}
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 2 }}>
-                  <TextField
-                    label="Search"
-                    size="small"
-                    value={homeFilters.search}
-                    onChange={(e) => setHomeFilters({ ...homeFilters, search: e.target.value })}
-                    placeholder="Token, Patient"
-                  />
-                  <FormControl size="small">
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={homeFilters.status}
-                      label="Status"
-                      onChange={(e) => setHomeFilters({ ...homeFilters, status: e.target.value })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      <MenuItem value="PendingAssignment">Pending Assignment</MenuItem>
-                      <MenuItem value="Assigned">Assigned</MenuItem>
-                      <MenuItem value="InProgress">In Progress</MenuItem>
-                      <MenuItem value="Collected">Collected</MenuItem>
-                      <MenuItem value="Cancelled">Cancelled</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small">
-                    <InputLabel>Area</InputLabel>
-                    <Select
-                      value={homeFilters.area}
-                      label="Area"
-                      onChange={(e) => setHomeFilters({ ...homeFilters, area: e.target.value })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      {getUniqueAreas(homeCollections).map(area => (
-                        <MenuItem key={area} value={area}>{area}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small">
-                    <InputLabel>Collector</InputLabel>
-                    <Select
-                      value={homeFilters.collector}
-                      label="Collector"
-                      onChange={(e) => setHomeFilters({ ...homeFilters, collector: e.target.value })}
-                    >
-                      <MenuItem value="All">All</MenuItem>
-                      {collectors.map(collector => (
-                        <MenuItem key={collector.id} value={collector.id}>{collector.name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <Button
-                    variant="contained"
-                    startIcon={<RouteIcon />}
-                    onClick={() => setRoutePlanningDialogOpen(true)}
-                  >
-                    Create Route
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* DataGrid */}
-            <Card>
-              <DataGrid
-                rows={filteredHomeCollections}
-                columns={homeCollectionColumns}
-                initialState={{
-                  pagination: { paginationModel: { pageSize: 25 } },
-                }}
-                pageSizeOptions={[25, 50, 100]}
-                sx={{ height: 600 }}
-              />
-            </Card>
-          </Box>
-        )}
-
-        {/* Floating Scan Button */}
-        <Fab
-          color="primary"
-          aria-label="scan"
-          sx={{ position: 'fixed', bottom: 24, right: 24 }}
-          onClick={() => setScannerDialogOpen(true)}
-        >
-          <QrCodeScannerIcon />
-        </Fab>
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+      {/* Page Header */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+          Sample Collection Management
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Manage and track all sample collections from patients
+        </Typography>
       </Box>
 
-      {/* Collection Dialog */}
-      <Dialog
-        open={collectionDialogOpen}
-        onClose={() => setCollectionDialogOpen(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="h5" fontWeight="bold">
-                Collect Sample
-              </Typography>
-              <Typography variant="h6" color="primary">
-                Token: {selectedCollection?.tokenNumber}
-              </Typography>
-            </Box>
-            <IconButton onClick={() => setCollectionDialogOpen(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Stack>
-        </DialogTitle>
-        <DialogContent dividers>
-          {selectedCollection && (
-            <Box>
-              {/* Patient Info */}
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" mb={2}>Patient Information</Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Name</Typography>
-                      <Typography variant="body1" fontWeight="bold">{selectedCollection.patient.name}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Age / Gender</Typography>
-                      <Typography variant="body1">{selectedCollection.patient.age} / {selectedCollection.patient.gender}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Mobile</Typography>
-                      <Typography variant="body1">{selectedCollection.patient.mobile}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Patient ID</Typography>
-                      <Typography variant="body1">{selectedCollection.patient.patientID}</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
+      {/* Quick Stats */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+          <StatsCard
+            icon={<HourglassEmptyIcon />}
+            label="Pending Collections"
+            count={stats.pending}
+            color="#FF9800"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+          <StatsCard
+            icon={<CheckCircleIcon />}
+            label="Collected Today"
+            count={stats.today}
+            color="#4CAF50"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+          <StatsCard
+            icon={<LocalShippingIcon />}
+            label="Home Pending"
+            count={stats.homeCollectionsPending}
+            color="#2196F3"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+          <StatsCard
+            icon={<WarningIcon />}
+            label="Quality Issues"
+            count={stats.qualityIssues}
+            color="#F44336"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+          <StatsCard
+            icon={<AlarmIcon />}
+            label="Overdue (>30m)"
+            count={stats.overdue}
+            color="#F44336"
+          />
+        </Grid>
+      </Grid>
 
-              {/* Tests Info */}
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" mb={2}>Tests Ordered</Typography>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Test Name</TableCell>
-                        <TableCell>Sample Type</TableCell>
-                        <TableCell>Volume (ml)</TableCell>
-                        <TableCell>Container</TableCell>
-                        <TableCell>Fasting</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {selectedCollection.tests.map((test) => (
-                        <TableRow key={test.id}>
-                          <TableCell>{test.testName}</TableCell>
-                          <TableCell>{test.sampleType}</TableCell>
-                          <TableCell>{test.sampleVolume}</TableCell>
-                          <TableCell>{test.containerType}</TableCell>
-                          <TableCell>{test.fastingRequired ? 'Yes' : 'No'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+      {/* Tabs */}
+      <Paper sx={{ mb: 2 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, newValue) => setActiveTab(newValue)}
+          aria-label="collection tabs"
+        >
+          <Tab label="Lab Collection" id="tab-0" aria-controls="tabpanel-0" />
+          <Tab label="Home Collection" id="tab-1" aria-controls="tabpanel-1" />
+        </Tabs>
+      </Paper>
 
-              {/* Special Instructions */}
-              {selectedCollection.specialInstructions && (
-                <Alert severity="warning" sx={{ mb: 3 }}>
-                  <Typography variant="body2" fontWeight="bold">Special Instructions:</Typography>
-                  <Typography variant="body2">{selectedCollection.specialInstructions}</Typography>
-                </Alert>
-              )}
-
-              {/* Collection Form */}
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" mb={2}>Collection Details</Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Collected By</InputLabel>
-                      <Select
-                        value={collectionFormData.collectorID}
-                        label="Collected By"
-                        onChange={(e) => {
-                          const collector = collectors.find(c => c.id === e.target.value);
-                          setCollectionFormData({
-                            ...collectionFormData,
-                            collectorID: e.target.value,
-                            collectorName: collector?.name || '',
-                          });
-                        }}
-                      >
-                        {collectors.map((collector) => (
-                          <MenuItem key={collector.id} value={collector.id}>
-                            {collector.name} ({collector.staffID})
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <TextField
-                      label="Collection Date"
-                      type="date"
-                      value={collectionFormData.collectionDate}
-                      onChange={(e) => setCollectionFormData({ ...collectionFormData, collectionDate: e.target.value })}
-                      InputLabelProps={{ shrink: true }}
-                      fullWidth
-                    />
-
-                    <TextField
-                      label="Collection Time"
-                      type="time"
-                      value={collectionFormData.collectionTime}
-                      onChange={(e) => setCollectionFormData({ ...collectionFormData, collectionTime: e.target.value })}
-                      InputLabelProps={{ shrink: true }}
-                      fullWidth
-                    />
-
-                    <FormControl fullWidth>
-                      <InputLabel>Fasting Status</InputLabel>
-                      <Select
-                        value={collectionFormData.fastingStatus}
-                        label="Fasting Status"
-                        onChange={(e) => setCollectionFormData({ ...collectionFormData, fastingStatus: e.target.value as any })}
-                      >
-                        <MenuItem value="Fasting">Fasting</MenuItem>
-                        <MenuItem value="NonFasting">Non-Fasting</MenuItem>
-                        <MenuItem value="NotApplicable">Not Applicable</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    {collectionFormData.fastingStatus === 'Fasting' && (
-                      <TextField
-                        label="Fasting Hours"
-                        type="number"
-                        value={collectionFormData.fastingHours || ''}
-                        onChange={(e) => setCollectionFormData({ ...collectionFormData, fastingHours: parseInt(e.target.value) })}
-                        fullWidth
-                      />
-                    )}
-
-                    <FormControl fullWidth>
-                      <InputLabel>Patient Condition</InputLabel>
-                      <Select
-                        value={collectionFormData.patientCondition}
-                        label="Patient Condition"
-                        onChange={(e) => setCollectionFormData({ ...collectionFormData, patientCondition: e.target.value as PatientCondition })}
-                      >
-                        <MenuItem value="Normal">Normal</MenuItem>
-                        <MenuItem value="Anxious">Anxious</MenuItem>
-                        <MenuItem value="DifficultVeinAccess">Difficult Vein Access</MenuItem>
-                        <MenuItem value="Other">Other</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <TextField
-                      label="Collection Notes"
-                      multiline
-                      rows={2}
-                      value={collectionFormData.collectionNotes || ''}
-                      onChange={(e) => setCollectionFormData({ ...collectionFormData, collectionNotes: e.target.value })}
-                      fullWidth
-                      sx={{ gridColumn: 'span 2' }}
-                    />
-                  </Box>
-                </CardContent>
-              </Card>
-
-              {/* Sample Details */}
-              {collectionFormData.samples.map((sample, index) => (
-                <Card key={index} sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6" mb={2}>Sample {index + 1}: {sample.sampleType}</Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                      <FormControl fullWidth>
-                        <InputLabel>Tube Type</InputLabel>
-                        <Select
-                          value={sample.tubeType}
-                          label="Tube Type"
-                          onChange={(e) => {
-                            const updated = [...collectionFormData.samples];
-                            updated[index].tubeType = e.target.value;
-                            setCollectionFormData({ ...collectionFormData, samples: updated });
-                          }}
-                        >
-                          {Object.entries(TUBE_TYPES).map(([key, val]) => (
-                            <MenuItem key={key} value={key}>{val.label}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-
-                      <TextField
-                        label="Number of Tubes"
-                        type="number"
-                        value={sample.numberOfTubes}
-                        onChange={(e) => {
-                          const updated = [...collectionFormData.samples];
-                          updated[index].numberOfTubes = parseInt(e.target.value);
-                          setCollectionFormData({ ...collectionFormData, samples: updated });
-                        }}
-                        fullWidth
-                      />
-
-                      <TextField
-                        label="Volume Collected (ml)"
-                        type="number"
-                        value={sample.volumeCollected}
-                        onChange={(e) => {
-                          const updated = [...collectionFormData.samples];
-                          updated[index].volumeCollected = parseFloat(e.target.value);
-                          setCollectionFormData({ ...collectionFormData, samples: updated });
-                        }}
-                        fullWidth
-                      />
-
-                      <FormControl fullWidth>
-                        <InputLabel>Sample Quality</InputLabel>
-                        <Select
-                          value={sample.quality}
-                          label="Sample Quality"
-                          onChange={(e) => {
-                            const updated = [...collectionFormData.samples];
-                            updated[index].quality = e.target.value as SampleQuality;
-                            setCollectionFormData({ ...collectionFormData, samples: updated });
-                          }}
-                        >
-                          {Object.entries(SAMPLE_QUALITY_OPTIONS).map(([key, val]) => (
-                            <MenuItem key={key} value={key}>{val.label}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-
-                      {sample.quality !== 'Good' && (
-                        <TextField
-                          label="Quality Issue Reason"
-                          multiline
-                          rows={2}
-                          value={sample.qualityNotes || ''}
-                          onChange={(e) => {
-                            const updated = [...collectionFormData.samples];
-                            updated[index].qualityNotes = e.target.value;
-                            setCollectionFormData({ ...collectionFormData, samples: updated });
-                          }}
-                          fullWidth
-                          sx={{ gridColumn: 'span 2' }}
-                        />
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))}
-
-              {/* Quality Checklist */}
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" mb={2}>Quality Checklist (All Required)</Typography>
-                  <FormGroup>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={collectionFormData.qualityChecklist.patientVerified}
-                          onChange={(e) => setCollectionFormData({
-                            ...collectionFormData,
-                            qualityChecklist: {
-                              ...collectionFormData.qualityChecklist,
-                              patientVerified: e.target.checked,
-                            },
-                          })}
-                        />
-                      }
-                      label="Correct patient verified"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={collectionFormData.qualityChecklist.correctTube}
-                          onChange={(e) => setCollectionFormData({
-                            ...collectionFormData,
-                            qualityChecklist: {
-                              ...collectionFormData.qualityChecklist,
-                              correctTube: e.target.checked,
-                            },
-                          })}
-                        />
-                      }
-                      label="Correct tube type used"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={collectionFormData.qualityChecklist.adequateVolume}
-                          onChange={(e) => setCollectionFormData({
-                            ...collectionFormData,
-                            qualityChecklist: {
-                              ...collectionFormData.qualityChecklist,
-                              adequateVolume: e.target.checked,
-                            },
-                          })}
-                        />
-                      }
-                      label="Sample volume adequate"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={collectionFormData.qualityChecklist.labelApplied}
-                          onChange={(e) => setCollectionFormData({
-                            ...collectionFormData,
-                            qualityChecklist: {
-                              ...collectionFormData.qualityChecklist,
-                              labelApplied: e.target.checked,
-                            },
-                          })}
-                        />
-                      }
-                      label="Label applied correctly"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={collectionFormData.qualityChecklist.storedProperly}
-                          onChange={(e) => setCollectionFormData({
-                            ...collectionFormData,
-                            qualityChecklist: {
-                              ...collectionFormData.qualityChecklist,
-                              storedProperly: e.target.checked,
-                            },
-                          })}
-                        />
-                      }
-                      label="Sample stored properly"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={collectionFormData.qualityChecklist.patientInformed}
-                          onChange={(e) => setCollectionFormData({
-                            ...collectionFormData,
-                            qualityChecklist: {
-                              ...collectionFormData.qualityChecklist,
-                              patientInformed: e.target.checked,
-                            },
-                          })}
-                        />
-                      }
-                      label="Patient informed about report time"
-                    />
-                  </FormGroup>
-                </CardContent>
-              </Card>
-
-              {/* Next Steps */}
-              <Card sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="h6" mb={2}>Next Steps</Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Send to Department</InputLabel>
-                      <Select
-                        value={collectionFormData.department}
-                        label="Send to Department"
-                        onChange={(e) => setCollectionFormData({ ...collectionFormData, department: e.target.value as Department })}
-                      >
-                        {DEPARTMENTS.map(dept => (
-                          <MenuItem key={dept} value={dept}>{dept}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth>
-                      <InputLabel>Priority</InputLabel>
-                      <Select
-                        value={collectionFormData.priority}
-                        label="Priority"
-                        onChange={(e) => setCollectionFormData({ ...collectionFormData, priority: e.target.value as any })}
-                      >
-                        <MenuItem value="Normal">Normal</MenuItem>
-                        <MenuItem value="Urgent">Urgent</MenuItem>
-                        <MenuItem value="STAT">STAT (Immediate)</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={collectionFormData.printLabels}
-                          onChange={(e) => setCollectionFormData({ ...collectionFormData, printLabels: e.target.checked })}
-                        />
-                      }
-                      label="Print Labels"
-                      sx={{ gridColumn: 'span 2' }}
-                    />
-
-                    {collectionFormData.printLabels && (
-                      <TextField
-                        label="Number of Labels"
-                        type="number"
-                        value={collectionFormData.numberOfLabels}
-                        onChange={(e) => setCollectionFormData({ ...collectionFormData, numberOfLabels: parseInt(e.target.value) })}
-                        fullWidth
-                      />
-                    )}
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCollectionDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="success" onClick={handleSubmitCollection}>
-            Mark as Collected
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Assign Collector Dialog */}
-      <Dialog
-        open={assignCollectorDialogOpen}
-        onClose={() => setAssignCollectorDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Assign Collector</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={3}>
-            <FormControl fullWidth>
-              <InputLabel>Select Collector</InputLabel>
+      {/* LAB COLLECTION TAB */}
+      <TabPanel value={activeTab} index={0}>
+        {/* Filters */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Grid container spacing={2} alignItems="flex-end">
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                fullWidth
+                placeholder="Search by token, name, or ID..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(0);
+                }}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} />,
+                }}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
               <Select
-                value={assignData.collectorID}
-                label="Select Collector"
-                onChange={(e) => setAssignData({ ...assignData, collectorID: e.target.value })}
+                fullWidth
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(0);
+                }}
+                size="small"
               >
-                {collectors.map((collector) => (
-                  <MenuItem key={collector.id} value={collector.id}>
-                    <Stack>
-                      <Typography>{collector.name} ({collector.staffID})</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {collector.currentAssignments} assignments • {collector.availability}
-                      </Typography>
-                    </Stack>
-                  </MenuItem>
-                ))}
+                <MenuItem value="all">All Status</MenuItem>
+                <MenuItem value="Pending Collection">Pending</MenuItem>
+                <MenuItem value="Collected">Collected</MenuItem>
               </Select>
-            </FormControl>
-
-            <TextField
-              label="Scheduled Time"
-              type="datetime-local"
-              value={assignData.scheduledTime}
-              onChange={(e) => setAssignData({ ...assignData, scheduledTime: e.target.value })}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
-
-            <TextField
-              label="Estimated Duration (minutes)"
-              type="number"
-              value={assignData.estimatedDuration}
-              onChange={(e) => setAssignData({ ...assignData, estimatedDuration: parseInt(e.target.value) })}
-              fullWidth
-            />
-
-            <TextField
-              label="Special Instructions"
-              multiline
-              rows={3}
-              value={assignData.specialInstructions}
-              onChange={(e) => setAssignData({ ...assignData, specialInstructions: e.target.value })}
-              fullWidth
-            />
-
-            <FormGroup>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={assignData.notifyCollector}
-                    onChange={(e) => setAssignData({ ...assignData, notifyCollector: e.target.checked })}
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <Select
+                fullWidth
+                value={typeFilter}
+                onChange={(e) => {
+                  setTypeFilter(e.target.value);
+                  setPage(0);
+                }}
+                size="small"
+              >
+                <MenuItem value="all">All Types</MenuItem>
+                <MenuItem value="Walk-in">Walk-in</MenuItem>
+                <MenuItem value="Scheduled">Scheduled</MenuItem>
+              </Select>
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <Stack direction="row" spacing={1}>
+                <Tooltip title="Scan barcode">
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<QrCodeScannerIcon />}
+                    onClick={() => setOpenScannerDialog(true)}
+                  >
+                    Scan
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Export to CSV">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={handleExportCSV}
+                  >
+                    Export
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Auto-refresh every minute">
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={autoRefresh}
+                        onChange={(e) => setAutoRefresh(e.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label="Auto"
+                    sx={{ m: 0 }}
                   />
-                }
-                label="Notify Collector (SMS/App)"
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={assignData.notifyPatient}
-                    onChange={(e) => setAssignData({ ...assignData, notifyPatient: e.target.checked })}
-                  />
-                }
-                label="Notify Patient (SMS)"
-              />
-            </FormGroup>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAssignCollectorDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAssignCollector}>
-            Assign
-          </Button>
-        </DialogActions>
-      </Dialog>
+                </Tooltip>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Paper>
 
-      {/* Scanner Dialog */}
-      <Dialog open={scannerDialogOpen} onClose={() => setScannerDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Scan Barcode/QR Code</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} alignItems="center">
-            <Box sx={{ width: '100%', height: 300, bgcolor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Typography color="text.secondary">Camera view would appear here</Typography>
-            </Box>
-            <Divider sx={{ width: '100%' }}>OR</Divider>
-            <TextField
-              label="Enter Sample ID / Token manually"
-              fullWidth
-              placeholder="S-2024-001 or T-2024-001"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setScannerDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Quality Issues Dialog */}
-      <Dialog
-        open={qualityIssuesDialogOpen}
-        onClose={() => setQualityIssuesDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Quality Issues</DialogTitle>
-        <DialogContent dividers>
-          <Table>
+        {/* Collections Table */}
+        <TableContainer component={Paper}>
+          <Table stickyHeader>
             <TableHead>
-              <TableRow>
-                <TableCell>Sample ID</TableCell>
-                <TableCell>Patient</TableCell>
-                <TableCell>Issue Type</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Actions</TableCell>
+              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={
+                      selectedCollections.size > 0 &&
+                      selectedCollections.size < filteredCollections.length
+                    }
+                    checked={
+                      filteredCollections.length > 0 &&
+                      selectedCollections.size === filteredCollections.length
+                    }
+                    onChange={handleSelectAll}
+                  />
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Priority</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Token</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Sample ID</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Patient</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Age/Gender</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Mobile</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Tests</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Wait Time</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {qualityIssues.map((issue) => (
-                <TableRow key={issue.id}>
-                  <TableCell>{issue.sampleID}</TableCell>
-                  <TableCell>{issue.patientName}</TableCell>
-                  <TableCell>
-                    <Chip label={issue.issueType} color="warning" size="small" />
+              {displayedCollections.map((collection) => (
+                <TableRow
+                  key={collection.id}
+                  hover
+                  sx={{
+                    backgroundColor:
+                      collection.priority === 'STAT'
+                        ? '#ffebee'
+                        : (collection.waitingMinutes || 0) > 30
+                        ? '#fff3e0'
+                        : 'white',
+                  }}
+                >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedCollections.has(collection.id)}
+                      onChange={() => handleSelectCollection(collection.id)}
+                    />
                   </TableCell>
-                  <TableCell>{issue.description}</TableCell>
                   <TableCell>
-                    <Chip label={issue.status} size="small" />
+                    <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                      {getPriorityLabel(collection.priority)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>
+                    {collection.tokenNumber}
                   </TableCell>
                   <TableCell>
-                    <Button size="small" variant="outlined">
-                      View
-                    </Button>
+                    <Typography variant="body2">{collection.sampleId}</Typography>
+                  </TableCell>
+                  <TableCell>{collection.patientName}</TableCell>
+                  <TableCell>
+                    {collection.age}/{collection.gender}
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="Call patient">
+                      <IconButton
+                        size="small"
+                        href={`tel:${collection.mobile}`}
+                        sx={{ p: 0.5 }}
+                      >
+                        <PhoneIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title={Array.isArray(collection.tests) ? collection.tests.join(', ') : ''}>
+                      <Typography variant="body2">
+                        {Array.isArray(collection.tests) && collection.tests.slice(0, 2).join(', ')}
+                        {Array.isArray(collection.tests) && collection.tests.length > 2 && ` +${collection.tests.length - 2}`}
+                      </Typography>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 'bold',
+                        color: getWaitingColor(collection.waitingMinutes || 0),
+                      }}
+                    >
+                      {collection.waitingMinutes} min
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={collection.bookingType}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.5}>
+                      <Tooltip title="Collect Sample">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCollectClick(collection)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                        >
+                          <CheckCircleIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="View Details">
+                        <IconButton size="small" color="info" sx={{ p: 0.5 }}>
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Print Token">
+                        <IconButton size="small" sx={{ p: 0.5 }}>
+                          <PrintIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQualityIssuesDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+        </TableContainer>
 
-      {/* Collected Samples Dialog */}
-      <Dialog
-        open={collectedViewDialogOpen}
-        onClose={() => setCollectedViewDialogOpen(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>Today&apos;s Collected Samples</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Total: {collectedSamples.length} samples
-          </Typography>
-          <Table size="small">
+        {filteredCollections.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography color="textSecondary">
+              No collections found matching your criteria
+            </Typography>
+          </Box>
+        ) : (
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            component="div"
+            count={filteredCollections.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        )}
+      </TabPanel>
+
+      {/* HOME COLLECTION TAB */}
+      <TabPanel value={activeTab} index={1}>
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Select fullWidth defaultValue="all" size="small">
+                <MenuItem value="all">All Status</MenuItem>
+                <MenuItem value="Pending Assignment">Pending Assignment</MenuItem>
+                <MenuItem value="Assigned">Assigned</MenuItem>
+                <MenuItem value="In Progress">In Progress</MenuItem>
+              </Select>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                placeholder="Search by patient name..."
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button fullWidth variant="contained" startIcon={<AddIcon />}>
+                Create Route
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button fullWidth variant="outlined" startIcon={<EditIcon />}>
+                Assign Collectors
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        <TableContainer component={Paper}>
+          <Table stickyHeader>
             <TableHead>
-              <TableRow>
-                <TableCell>Sample ID</TableCell>
-                <TableCell>Token</TableCell>
-                <TableCell>Patient</TableCell>
-                <TableCell>Tests</TableCell>
-                <TableCell>Collected By</TableCell>
-                <TableCell>Time</TableCell>
+              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>Token</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Patient</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Mobile</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Area</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Time Slot</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Collector</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {collectedSamples.slice(0, 20).map((sample) => (
-                <TableRow key={sample.id}>
-                  <TableCell>{sample.sampleID}</TableCell>
-                  <TableCell>{sample.tokenNumber}</TableCell>
-                  <TableCell>{sample.patient.name}</TableCell>
-                  <TableCell>{sample.tests[0].testName}</TableCell>
-                  <TableCell>{sample.collectedBy}</TableCell>
-                  <TableCell>{sample.collectedAt ? formatTime(sample.collectedAt) : '-'}</TableCell>
+              {homeCollections.map((collection) => (
+                <TableRow key={collection.id} hover>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{collection.tokenNumber}</TableCell>
+                  <TableCell>{collection.patientName}</TableCell>
+                  <TableCell>
+                    <Tooltip title="Call patient">
+                      <IconButton size="small" href={`tel:${collection.mobile}`} sx={{ p: 0.5 }}>
+                        <PhoneIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>{collection.area}</TableCell>
+                  <TableCell>
+                    {new Date(collection.preferredDate).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>{collection.preferredTimeSlot}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={collection.status}
+                      size="small"
+                      color={
+                        collection.status === 'Collected'
+                          ? 'success'
+                          : collection.status === 'Cancelled'
+                          ? 'error'
+                          : 'warning'
+                      }
+                      variant="filled"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {collection.assignedCollector ? (
+                      <Typography variant="body2">{collection.assignedCollector.name}</Typography>
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">
+                        Not Assigned
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.5}>
+                      <Tooltip title="View Details">
+                        <IconButton size="small" color="primary" sx={{ p: 0.5 }}>
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Navigate">
+                        <IconButton size="small" sx={{ p: 0.5 }}>
+                          <CallReceivedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCollectedViewDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Dialogs */}
+      <CollectSampleDialog
+        open={openCollectDialog}
+        collection={selectedCollection}
+        onClose={() => setOpenCollectDialog(false)}
+        onSubmit={handleCollectSubmit}
+      />
+
+      <BarcodeScannerDialog
+        open={openScannerDialog}
+        onClose={() => setOpenScannerDialog(false)}
+        onScan={handleScan}
+      />
 
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={6000}
+        autoHideDuration={3000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity as any}
+          sx={{ width: '100%' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </DashboardLayout>
+
+      {/* Floating Action Button - Scan */}
+      <Tooltip title="Scan Sample" placement="left">
+        <Button
+          variant="contained"
+          color="primary"
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            borderRadius: '50%',
+            width: 60,
+            height: 60,
+            minWidth: 0,
+            zIndex: 1000,
+            boxShadow: 3,
+            '&:hover': {
+              boxShadow: 5,
+            },
+          }}
+          onClick={() => setOpenScannerDialog(true)}
+        >
+          <QrCodeScannerIcon sx={{ fontSize: 28 }} />
+        </Button>
+      </Tooltip>
+    </Container>
   );
 }

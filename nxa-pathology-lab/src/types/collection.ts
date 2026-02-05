@@ -1,51 +1,109 @@
-// Sample Collection Module Types
+import { Address } from './patient';
+import { Test } from './test';
 
 // Enums
-export type CollectionStatus = 
-  | 'Pending' 
-  | 'Collected' 
-  | 'Rejected' 
-  | 'InProgress' 
-  | 'QualityIssue';
+export enum SampleQuality {
+  Good = 'Good',
+  Hemolyzed = 'Hemolyzed',
+  Clotted = 'Clotted',
+  InsufficientVolume = 'InsufficientVolume',
+  Lipemic = 'Lipemic',
+  Contaminated = 'Contaminated'
+}
 
-export type SampleQuality = 
-  | 'Good' 
-  | 'Hemolyzed' 
-  | 'Clotted' 
-  | 'Insufficient' 
-  | 'Lipemic' 
-  | 'Contaminated';
+export enum TubeType {
+  EdtaTube = 'EDTA Tube (Purple/Lavender Cap)',
+  PlainTube = 'Plain Tube (Red Cap)',
+  SodiumCitrateTube = 'Sodium Citrate Tube (Blue Cap)',
+  FluorideTube = 'Fluoride Tube (Gray Cap)',
+  HeparinTube = 'Heparin Tube (Green Cap)',
+  GelTube = 'Gel Tube (Yellow Cap)',
+  SterileUrineContainer = 'Sterile Urine Container',
+  PlainUrineContainer = 'Plain Container',
+  UrineCollectionBottle = '24-hour Collection Bottle',
+  StoolContainer = 'Stool Container with Preservative',
+  PlainStoolContainer = 'Plain Stool Container'
+}
 
-export type TubeType = 
-  | 'EDTA' 
-  | 'Plain' 
-  | 'SodiumCitrate' 
-  | 'Fluoride' 
-  | 'Gel';
+export enum CollectionStatus {
+  Pending = 'Pending Collection',
+  Collected = 'Collected',
+  Rejected = 'Rejected'
+}
 
-export type HomeCollectionStatus = 
-  | 'PendingAssignment' 
-  | 'Assigned' 
-  | 'InProgress' 
-  | 'Collected' 
-  | 'Cancelled';
+export enum HomeCollectionStatus {
+  PendingAssignment = 'Pending Assignment',
+  Assigned = 'Assigned',
+  InProgress = 'In Progress',
+  Collected = 'Collected',
+  Cancelled = 'Cancelled'
+}
+
+export enum Priority {
+  Normal = 'Normal',
+  Urgent = 'Urgent',
+  STAT = 'STAT'
+}
+
+export enum BookingType {
+  WalkIn = 'Walk-in',
+  Scheduled = 'Scheduled'
+}
+
+export enum PatientCondition {
+  Normal = 'Normal',
+  Anxious = 'Anxious',
+  DifficultVeinAccess = 'Difficult Vein Access',
+  PatientMoved = 'Patient Moved/Flinched',
+  Pediatric = 'Pediatric (child)',
+  Geriatric = 'Geriatric (elderly)',
+  Other = 'Other'
+}
+
+export enum FastingStatus {
+  Fasting = 'Fasting',
+  NonFasting = 'Non-Fasting',
+  NotApplicable = 'Not Applicable'
+}
+
+export enum CollectionSite {
+  LeftArm = 'Left Arm',
+  RightArm = 'Right Arm',
+  LeftHand = 'Left Hand',
+  RightHand = 'Right Hand',
+  Other = 'Other'
+}
+
+export enum SampleLocation {
+  InCollection = 'In Collection',
+  InTransit = 'In Transit',
+  AtTesting = 'At Testing'
+}
+
+export enum NextStep {
+  Waiting = 'Waiting',
+  Testing = 'Testing',
+  Reported = 'Reported'
+}
+
+export enum QualityIssueStatus {
+  ReCollectionRequested = 'Re-collection Requested',
+  Cancelled = 'Cancelled',
+  AcceptedWithDisclaimer = 'Accepted with Disclaimer',
+  PendingAction = 'Pending Action'
+}
+
+export enum TimeFilter {
+  AllDay = 'All Day',
+  Overdue = 'Overdue (>30 mins)',
+  Next1Hour = 'Next 1 Hour',
+  Next2Hours = 'Next 2 Hours'
+}
 
 export type CollectionMethod = 
   | 'Random' 
   | 'Midstream' 
   | '24Hour';
-
-export type PatientCondition = 
-  | 'Normal' 
-  | 'Anxious' 
-  | 'DifficultVeinAccess' 
-  | 'Other';
-
-export type CollectionSite = 
-  | 'LeftArm' 
-  | 'RightArm' 
-  | 'Hand' 
-  | 'Other';
 
 export type Department = 
   | 'Hematology' 
